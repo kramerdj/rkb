@@ -1,0 +1,38 @@
+RKB Collection Manager · instalación en Mac
+===========================================
+
+Necesitás: una Mac con chip Apple (M1, M2, M3, M4 o más nuevo) y Rekordbox 6 o 7.
+(En el menú  → Acerca de esta Mac, donde dice "Chip" tiene que decir "Apple M…".)
+
+
+1) INSTALAR
+   - Descomprimí el zip (doble clic).
+   - Arrastrá "RKB Collection Manager" a la carpeta Aplicaciones.
+
+2) LA PRIMERA VEZ QUE LA ABRÍS
+   La app es gratuita y no está registrada en Apple, así que macOS la frena la primera vez:
+   - Abrila con doble clic. Va a aparecer un aviso de que no se pudo verificar: tocá "Listo".
+   - Andá a Ajustes del Sistema → Privacidad y seguridad.
+   - Bajá hasta el final: aparece "Se bloqueó RKB Collection Manager". Tocá "Abrir igualmente".
+   - Confirmá con tu contraseña o Touch ID. Desde ahí se abre normal.
+
+3) PERMISO PARA LEER TU MÚSICA (importante)
+   - Ajustes del Sistema → Privacidad y seguridad → Acceso total al disco.
+   - Activá "RKB Collection Manager" (si no está en la lista, agregala con el botón +).
+   - Cerrá la app y volvé a abrirla.
+   Sin este permiso no se ven las carátulas, no suena el reproductor y no se pueden mover archivos.
+
+4) ANTES DE EMPEZAR
+   - Hacé un backup de Rekordbox: en Rekordbox, Archivo → Biblioteca → Hacer copia de seguridad.
+     (La app también tiene su sección "Backup y restauración".)
+   - Para guardar cambios en Rekordbox, Rekordbox tiene que estar CERRADO.
+     La app avisa abajo a la izquierda si está abierto.
+   - La primera vez la app te pide la carpeta donde tenés tu música (te sugiere una según Rekordbox).
+
+
+¿ALGO NO ANDA?
+   En la app: Acerca de → "Reportar un problema". Se arma un archivo en Descargas;
+   mandáselo a Guido (KRAMER DJ). No incluye tu música ni tu base de Rekordbox.
+
+La app se usa bajo tu propia responsabilidad. Es software libre (GPL-3.0).
+Rekordbox es una marca de AlphaTheta Corporation; esta app no está afiliada a AlphaTheta ni a Pioneer DJ.

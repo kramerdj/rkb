@@ -1,0 +1,34 @@
+RKB Collection Manager · instalación en Windows
+===============================================
+
+Necesitás: Windows 10 u 11 (64 bits) y Rekordbox 6 o 7.
+
+
+1) INSTALAR
+   - Descomprimí el zip (clic derecho → Extraer todo).
+   - Guardá "RKB Collection Manager.exe" donde quieras (por ejemplo en Documentos o en el Escritorio).
+     No hace falta instalar nada más: es un solo archivo.
+
+2) LA PRIMERA VEZ QUE LA ABRÍS
+   La app es gratuita y no está firmada, así que Windows la frena la primera vez:
+   - Si aparece "Windows protegió su PC": tocá "Más información" y después "Ejecutar de todas formas".
+   - Si el antivirus pregunta, permitila.
+   - La primera vez tarda unos segundos más en abrir; es normal.
+
+3) ANTES DE EMPEZAR
+   - Hacé un backup de Rekordbox: en Rekordbox, Archivo → Biblioteca → Hacer copia de seguridad.
+     (La app también tiene su sección "Backup y restauración".)
+   - Para guardar cambios en Rekordbox, Rekordbox tiene que estar CERRADO.
+     La app avisa abajo a la izquierda si está abierto.
+   - La primera vez la app te pide la carpeta donde tenés tu música (te sugiere una según Rekordbox).
+
+   Si la ventana sale en blanco: instalá "Microsoft Edge WebView2 Runtime" (gratis, de microsoft.com).
+   Windows 11 ya lo trae.
+
+
+¿ALGO NO ANDA?
+   En la app: Acerca de → "Reportar un problema". Se arma un archivo en Descargas;
+   mandáselo a Guido (KRAMER DJ). No incluye tu música ni tu base de Rekordbox.
+
+La app se usa bajo tu propia responsabilidad. Es software libre (GPL-3.0).
+Rekordbox es una marca de AlphaTheta Corporation; esta app no está afiliada a AlphaTheta ni a Pioneer DJ.

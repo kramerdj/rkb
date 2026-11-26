@@ -1,0 +1,380 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RKB Collection Manager</title>
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+<div class="app">
+  <nav class="menu" aria-label="Secciones">
+    <div class="marca">
+      <svg width="30" height="30" viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="16" r="15" fill="none" stroke="#F5A524" stroke-width="2"/><circle cx="16" cy="16" r="5" fill="#F5A524"/></svg>
+      <div><b>RKB</b><small>Collection Manager</small></div>
+    </div>
+    <div class="items" id="menu"></div>
+    <div class="estado-rb" id="estadoRb"><span class="punto"></span><span>Revisando Rekordbox…</span></div>
+    <div class="pie-menu"><button class="salir" id="btnAcerca" type="button">Acerca de</button><button class="salir" id="btnSalir" type="button">Cerrar la app</button></div>
+  </nav>
+
+  <main id="vistas">
+    <!-- 1 · LISTA -->
+    <section class="vista" data-vista="lista">
+      <header class="cab">
+        <div><p class="paso">Paso 1</p><h1>Lista de temas</h1>
+          <p class="sub">Cargá una lista de temas o el link de una playlist: la app la compara con Rekordbox y arma la lista de lo que hay que bajar.</p></div>
+        <div class="acciones">
+          <input type="file" id="lsArchivo" accept=".txt,.csv,.tsv,.m3u,.m3u8,text/plain" hidden>
+          <button type="button" class="btn" id="lsCargar">Cargar archivo (txt, csv, m3u)…</button>
+        </div>
+      </header>
+      <div class="lista-cuerpo">
+        <div class="panel lista-entrada">
+          <form class="ls-link" id="lsLinkForm">
+            <label class="campo-v">Link de Spotify, YouTube Music o Deezer
+              <input id="lsLink" placeholder="https://open.spotify.com/playlist/…" spellcheck="false"></label>
+            <button type="submit" class="btn" id="lsTraer">Traer la lista</button>
+          </form>
+          <label class="campo-v">Nombre de la lista / evento<input id="lsNombre" placeholder="Ej: Casamiento Sofi y Tomi"></label>
+          <label class="campo-v grow">Temas (uno por línea: «Artista - Tema»)<textarea id="lsTexto" spellcheck="false" placeholder="Soda Stereo - De música ligera&#10;Bad Bunny - Tití me preguntó&#10;…"></textarea></label>
+          <div class="acciones"><button type="button" class="btn" id="lsNueva">Nueva lista</button>
+          <button type="button" class="btn prim" id="lsComparar">Comparar con la colección</button></div>
+        </div>
+        <div class="panel lista-res">
+          <div class="dup-filtros" id="lsTabs"></div>
+          <div class="ls-filas" id="lsFilas"><p class="nota">Pegá o cargá una lista y tocá «Comparar con la colección».</p></div>
+          <div class="ls-pie" id="lsPie" hidden>
+            <div class="ls-opc">
+              <label><input type="checkbox" id="lsEvento"> Crear el evento como playlist en Rekordbox (con los temas que ya tenés)</label>
+              <label><input type="checkbox" id="lsLinks" checked> Agregar links de búsqueda (Beatsource, Beatport, iTunes, Bandcamp)</label>
+            </div>
+            <div class="acciones"><button type="button" class="btn" id="lsSpotify">Crear playlist en Spotify</button>
+            <button type="button" class="btn prim" id="lsGenerar">Generar lista depurada</button></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 2 · DESCARGAS -->
+    <section class="vista" data-vista="descargas">
+      <header class="cab">
+        <div><p class="paso">Paso 2</p><h1>Descargas</h1>
+          <p class="sub" id="dsCarpeta"></p></div>
+        <div class="acciones">
+          <button type="button" class="btn" id="dsCambiar">Cambiar carpeta…</button>
+          <button type="button" class="btn" id="dsActualizar">Actualizar</button>
+          <button type="button" class="btn prim" id="dsAnalizar">Analizar</button>
+        </div>
+      </header>
+      <div class="ds-cuerpo">
+        <aside class="panel ds-ajustes">
+          <h2>Qué datos actualizar</h2><div id="dsCampos" class="checks"></div>
+          <h2 class="sep">Fuentes de consulta</h2><div id="dsFuentes" class="checks"></div>
+          <p class="nota">Se guardan para la próxima vez. Calidad: OK ≥ 19 kHz · Dudoso 17,5–19 · Malo &lt; 17,5.</p>
+        </aside>
+        <div class="panel ds-tabla">
+          <div class="progreso" id="dsProg" hidden><div class="pbar"><div id="dsProgIn"></div></div><span id="dsProgTxt"></span><button type="button" class="btn chico" id="dsCancelar">Cancelar</button></div>
+          <div id="dsFilas"></div>
+        </div>
+      </div>
+      <div class="pie-paso" id="dsPie" hidden>
+        <span class="nota" id="dsPieTxt"></span>
+        <button type="button" class="btn prim" id="dsGuardar">Guardar y preparar</button>
+      </div>
+    </section>
+
+    <!-- 3 · INCORPORAR -->
+    <section class="vista" data-vista="incorporar">
+      <header class="cab">
+        <div><p class="paso">Paso 3</p><h1>Incorporar a la colección</h1>
+          <p class="sub" id="inSub">Mueve los temas preparados a la colección y los agrega a Rekordbox.</p></div>
+      </header>
+      <div class="in-cuerpo">
+        <div class="panel">
+          <div class="in-cab"><h2 id="inTit">Temas preparados</h2>
+            <label class="campo-in">Agregar a la playlist <select id="inPlaylist"></select></label></div>
+          <label class="in-fecha"><input type="checkbox" id="inFecha" checked> Crear además una playlist «Importación AAAA-MM-DD» con estos temas (en la carpeta Importaciones)</label>
+          <div class="in-player" id="inPlayer" hidden>
+            <button type="button" class="play chico" id="inPlay" aria-label="Pausa">❚❚</button>
+            <span class="in-ahora" id="inAhora"></span>
+            <div class="barra" id="inBarra"><div id="inBarraIn"></div></div>
+            <span class="tiempo" id="inTiempo"></span>
+          </div>
+          <div id="inFilas"></div>
+          <ol class="nota in-pasos"><li>Backup de la base de Rekordbox.</li><li>Mueve los archivos a la carpeta de la colección (sin pisar nada).</li><li>Los agrega a Rekordbox con su metadata y sus My Tags automáticos.</li><li>Después, en Rekordbox: seleccionalos → clic derecho → Analizar pista.</li></ol>
+          <div class="acciones fin"><button type="button" class="btn prim" id="inIncorporar">Incorporar</button></div>
+        </div>
+        <div class="panel">
+          <div class="in-cab"><h2>Chequeo antes del evento</h2>
+            <label class="campo-in">Playlist <select id="chPlaylist"></select></label></div>
+          <div id="chRes"><p class="nota">Elegí la playlist del evento.</p></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 4 · MY TAGS -->
+    <section class="vista" data-vista="mytags">
+      <header class="cab">
+        <div><p class="paso">Paso 4</p><h1>My Tags</h1>
+          <p class="sub">Rekordbox permite 4 categorías. Elegí el nombre de cada una y de dónde salen sus tags: automáticos desde la metadata, o manuales.</p></div>
+        <div class="acciones">
+          <button type="button" class="btn" id="mtSimular">Simular</button>
+          <button type="button" class="btn prim" id="mtAplicar">Actualizar base de Rekordbox</button>
+        </div>
+      </header>
+      <div class="cats" id="mtCats"></div>
+      <pre class="log" id="mtLog" hidden></pre>
+    </section>
+
+    <!-- 5 · COLECCIÓN -->
+    <section class="vista" data-vista="coleccion" id="vColeccion">
+      <header class="cab">
+        <div><p class="paso">Paso 5</p><h1>Colección</h1></div>
+        <div class="acciones">
+          <button type="button" class="btn" id="btnNombres">Ordenar nombres</button>
+          <button type="button" class="btn" id="btnDup">Buscar duplicados</button>
+          <button type="button" class="btn" id="btnTraer">Traer cambios de Rekordbox</button>
+          <button type="button" class="btn" id="btnDescartar" hidden>Descartar</button>
+          <button type="button" class="btn prim" id="btnSync">Sincronizar</button>
+        </div>
+      </header>
+
+      <div class="permiso" id="primeraVez" hidden>
+        <div><b id="primeraVezTit">Falta elegir tu carpeta de música.</b><span id="primeraVezTxt">La app busca la colección en una carpeta que no existe. Elegí la carpeta donde tenés los temas que usa Rekordbox.</span></div>
+        <div class="acciones" id="primeraVezAcc"><button type="button" class="btn prim chico" id="btnPrimeraVez">Ir a Ajustes</button></div>
+      </div>
+      <div class="permiso" id="permiso" hidden>
+        <div><b>macOS no deja que la app lea tus archivos de música.</b><span>Por eso no se ven las carátulas ni suena el reproductor. Activá «RKB Collection Manager» en Ajustes del Sistema → Privacidad y seguridad → Acceso total al disco, y volvé a abrir la app.</span></div>
+        <button type="button" class="btn prim chico" id="btnPrivacidad">Abrir Ajustes del Sistema</button>
+      </div>
+      <div class="filtros" id="filtros">
+        <input id="buscar" type="search" placeholder="Buscar artista, tema o álbum…" aria-label="Buscar">
+      </div>
+
+      <div class="player">
+        <button type="button" class="play" id="btnPlay" aria-label="Reproducir">▶</button>
+        <div class="ahora"><b id="pTitulo">Elegí un tema</b><span id="pSub"></span></div>
+        <div class="barra" id="barra" title="Clic para saltar"><div id="barraIn"></div></div>
+        <span class="tiempo" id="pTiempo">0:00 / 0:00</span>
+        <label class="p-inicio" title="Desde dónde arranca cada tema">Arranca en
+          <select id="pInicio"><option value="inicio">el principio</option><option value="seg">segundos…</option><option value="30">el 30 %</option><option value="cue">el primer cue</option></select>
+          <input id="pSeg" type="number" min="0" max="600" step="5" aria-label="Segundos desde el inicio"><span id="pSegTxt">s</span>
+        </label>
+        <audio id="audio" preload="none"></audio>
+      </div>
+
+      <div class="momentos">
+        <span class="lbl">Momento:</span>
+        <div id="momBtns" class="mom-btns"></div>
+        <span class="atajos"><kbd id="kbdCmd">⌘</kbd>clic varios <kbd>⇧</kbd>clic rango <kbd>Tab</kbd> siguiente <kbd>⇧Tab</kbd> anterior <kbd>Espacio</kbd> play <kbd>←</kbd><kbd>→</kbd> ±10 s <kbd>0</kbd> borrar</span>
+      </div>
+
+      <div class="cuerpo">
+        <div class="tabla" id="tabla" role="grid" aria-label="Temas">
+          <div class="fila enc" id="encabezado"></div>
+          <div id="filas"></div>
+        </div>
+        <aside class="meta" id="meta">
+          <div class="meta-cab"><h2>Metadata</h2><span id="metaEstado"></span></div>
+          <div class="tapa">
+            <button type="button" class="tapa-img" id="tapa" aria-label="Ver carátula grande"><span>Sin carátula</span></button>
+            <div class="tapa-txt"><b id="tapaTit"></b><span id="tapaSub"></span></div>
+          </div>
+          <form id="metaForm" autocomplete="off"></form>
+          <div id="lote" hidden>
+            <p class="nota">Lo que completes se aplica a todos los temas seleccionados. Lo que dejes vacío no se toca.</p>
+            <form id="loteForm" autocomplete="off"></form>
+            <div class="meta-acc"><button type="button" class="btn prim chico" id="btnLote">Aplicar</button><button type="button" class="btn chico" id="btnLoteCancelar">Quitar selección</button></div>
+            <p class="nota">También podés poner el Momento a todos juntos con las teclas 1–4.</p>
+          </div>
+          <div class="tags-man" id="tagsMan"></div>
+          <p class="nota" id="metaArchivo"></p>
+          <div class="meta-acc">
+            <button type="button" class="btn chico" id="btnFinder">Mostrar en Finder</button>
+            <button type="button" class="btn chico" id="btnDescTema" hidden>Descartar cambios del tema</button>
+          </div>
+          <p class="nota">Los cambios quedan pendientes hasta que toques <b>Sincronizar</b>: se escriben en el archivo y en Rekordbox, y se recalculan los My Tags automáticos.</p>
+          <div class="siguen" id="siguen">
+            <h3>Siguen bien <span class="nota" id="sgCuenta"></span></h3>
+            <div class="sg-opc">
+              <label><input type="checkbox" id="sgGenero" checked> mismo género</label>
+              <label><input type="checkbox" id="sgMomento"> mismo Momento</label>
+              <label><input type="checkbox" id="sgTono" checked> tono compatible</label>
+              <label>BPM ± <select id="sgBpm"><option value="3">3 %</option><option value="6" selected>6 %</option><option value="10">10 %</option></select></label>
+            </div>
+            <div id="sgLista"></div>
+          </div>
+        </aside>
+      </div>
+    </section>
+
+    <!-- EVENTOS TOCADOS -->
+    <section class="vista" data-vista="eventos">
+      <header class="cab"><div><h1>Eventos tocados</h1><p class="sub">Lo que pasaste en cada fecha, según el historial de Rekordbox.</p></div>
+        <div class="acciones"><button type="button" class="btn" id="evNunca">Ver los nunca tocados en Colección</button></div></header>
+      <div class="dup-filtros" id="evTabs"></div>
+      <div class="ev-cuerpo">
+        <div class="panel ev-lista" id="evLista"></div>
+        <div class="panel ev-det" id="evDet"><p class="nota">Elegí una fecha.</p></div>
+      </div>
+    </section>
+
+    <!-- ACERCA DE -->
+    <section class="vista" data-vista="acerca">
+      <div class="acerca">
+        <svg width="72" height="72" viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="16" r="15" fill="none" stroke="#F5A524" stroke-width="2"/><circle cx="16" cy="16" r="5" fill="#F5A524"/></svg>
+        <h1>RKB Collection Manager</h1>
+        <p class="sub" id="acVersion"></p>
+        <p class="lema">Organizá tu colección de Rekordbox: listas de temas, metadata, calidad, duplicados, My Tags, eventos y backups.</p>
+
+        <div class="ac-bloque">
+          <h2>Autor</h2>
+          <p><b>Guido · KRAMER DJ</b></p>
+          <p class="nota">Idea, criterios y diseño de la herramienta.</p>
+        </div>
+        <div class="ac-bloque">
+          <h2>Desarrollo</h2>
+          <p>Programada con la asistencia de <b>Claude</b>, el asistente de IA de Anthropic.</p>
+        </div>
+
+        <div class="ac-bloque">
+          <h2>Hecha con software libre</h2>
+          <ul class="ac-lista">
+            <li><b>pyrekordbox</b> — lectura y escritura de la base de Rekordbox · MIT · Dylan Jones</li>
+            <li><b>mutagen</b> — etiquetas de los archivos de audio · GPL-2.0 o posterior</li>
+            <li><b>pywebview</b> — ventana propia · BSD-3-Clause</li>
+            <li><b>PyInstaller</b> — armado de la app · GPL-2.0 con excepción de distribución</li>
+            <li><b>FFmpeg</b> (vía imageio-ffmpeg) — decodificación de audio para medir la calidad · LGPL/GPL</li>
+            <li><b>NumPy</b> — análisis del espectro · BSD-3-Clause</li>
+            <li><b>Pillow</b> — carátulas · MIT-CMU</li>
+            <li><b>Requests</b> — conexiones · Apache-2.0</li>
+            <li><b>Supabase</b> — servidor de la Cartelera y Mis anuncios</li>
+            <li><b>SQLAlchemy</b> y <b>sqlcipher3</b> — acceso a la base · MIT · zlib</li>
+            <li><b>Python</b> · PSF License</li>
+          </ul>
+        </div>
+        <div class="ac-bloque">
+          <h2>Datos de</h2>
+          <p class="nota">MusicBrainz y Cover Art Archive (MetaBrainz Foundation) · Wikidata · Apple iTunes Search · Deezer · Last.fm · Discogs · Spotify Web API · YouTube Data API.</p>
+        </div>
+
+        <div class="ac-bloque">
+          <h2>Conexión a internet y privacidad</h2>
+          <p class="nota">Tu colección, tus archivos y tu base de Rekordbox nunca salen de tu computadora. La app se conecta a internet sólo para: buscar metadata y carátulas (paso 2), leer playlists de Spotify, YouTube o Deezer, avisar si hay una versión nueva y mostrar la Cartelera (al servidor sólo se le dice el país que elegiste). Si publicás anuncios, se guarda tu email (no se muestra), tu nombre de DJ y lo que publicás.</p>
+        </div>
+        <div class="ac-bloque">
+          <h2>Licencia</h2>
+          <p class="nota"><b>Se usa bajo tu propia responsabilidad.</b> RKB Collection Manager es software libre bajo la licencia <b>GNU GPL versión 3 o posterior</b>: se puede usar, compartir y modificar, siempre que se comparta también el código. Se distribuye sin garantía de ningún tipo; antes de cada cambio la app hace un backup, pero usala bajo tu propia responsabilidad.</p>
+          <div class="acciones"><button type="button" class="btn chico" id="acLicencia">Ver licencia</button><button type="button" class="btn chico" id="acFuente">Guardar el código fuente en Descargas</button></div>
+        </div>
+        <div class="ac-bloque">
+          <h2>¿Algo no anda?</h2>
+          <p class="nota">Armá un informe y mandáselo a Guido (KRAMER DJ). Incluye la versión, tu sistema, los ajustes de la app (sin claves) y el registro de errores. No incluye tu música ni tu base de Rekordbox.</p>
+          <div class="acciones"><button type="button" class="btn chico prim" id="acInforme">Reportar un problema</button></div>
+        </div>
+        <p class="nota legal">Rekordbox es una marca de AlphaTheta Corporation. Spotify, YouTube, Apple, iTunes y Deezer son marcas de sus respectivos dueños. Esta app es independiente: no está afiliada, patrocinada ni respaldada por ninguna de esas empresas.</p>
+      </div>
+    </section>
+
+    <!-- CARTELERA -->
+    <section class="vista" data-vista="cartelera">
+      <header class="cab"><div><h1>Cartelera</h1><p class="sub">Eventos, cursos, equipos y búsquedas de DJs de tu zona.</p></div>
+        <div class="acciones"><button type="button" class="btn" id="ctUbic"></button><button type="button" class="btn prim" id="ctPublicar">Publicar un anuncio</button></div></header>
+      <div class="ct-barra"><div class="dup-filtros" id="ctTipos"></div>
+        <label class="campo-in"><input type="checkbox" id="ctInicio"> Avisarme de los anuncios nuevos al abrir la app</label></div>
+      <div id="ctLista" class="ct-grilla"></div>
+    </section>
+
+    <!-- MIS ANUNCIOS -->
+    <section class="vista" data-vista="misanuncios">
+      <header class="cab"><div><h1>Mis anuncios</h1><p class="sub">Publicá tus eventos, cursos, equipos en venta o búsquedas en la Cartelera de todos los que usan la app.</p></div>
+        <div class="acciones" id="maAcc"></div></header>
+      <div id="maCuerpo"></div>
+    </section>
+
+    <!-- BACKUP Y RESTAURACIÓN -->
+    <section class="vista" data-vista="respaldos">
+      <header class="cab"><div><h1>Backup y restauración</h1><p class="sub">Copia completa de la base de Rekordbox y de tu colección musical, para recuperar todo si algo sale mal o si cambiás de computadora.</p></div></header>
+      <div class="panel rs-destino">
+        <div class="carpeta"><b>Carpeta de backups</b>
+          <div class="fila2"><span class="ruta" id="rsDestino"></span><button type="button" class="btn chico" id="rsCambiar">Cambiar…</button><button type="button" class="btn chico" id="rsAbrir">Abrir</button></div>
+          <span class="nota" id="rsLibre">Conviene que sea un disco externo: si se rompe la computadora, el backup queda a salvo.</span></div>
+      </div>
+      <div class="progreso rs-prog" id="rsProg" hidden><div class="pbar"><div id="rsProgIn"></div></div><span id="rsProgTxt"></span><button type="button" class="btn chico" id="rsCancelar">Cancelar</button></div>
+      <div class="dos">
+        <div class="panel">
+          <h2>Hacer un backup</h2>
+          <div class="checks">
+            <label><input type="checkbox" id="rsBase" checked> Base de Rekordbox <small>playlists, cues, My Tags, historial</small></label>
+            <label class="rs-sub"><input type="checkbox" id="rsShare"> Incluir análisis y carátulas <small id="rsShareTam">carpeta share</small></label>
+            <label><input type="checkbox" id="rsCol" checked> Colección musical <small>los archivos de audio</small></label>
+            <label class="rs-sub"><input type="checkbox" id="rsOtros"> Incluir temas de Rekordbox que están fuera de la carpeta</label>
+          </div>
+          <p class="nota">La base se guarda en un zip con fecha (cada backup es uno nuevo). La colección se guarda como copia espejo: la primera vez copia todo y después sólo lo nuevo o cambiado. Lo que ya no está en tu colección no se borra del backup: se aparta en «_quitados».</p>
+          <p class="nota">Para la base, Rekordbox tiene que estar cerrado.</p>
+          <div class="acciones"><button type="button" class="btn prim" id="rsHacer">Hacer backup ahora</button></div>
+          <div id="rsUltimo"></div>
+        </div>
+        <div class="panel">
+          <h2>Restaurar</h2>
+          <h3 class="rs-h3">Base de Rekordbox</h3>
+          <p class="nota">Vuelve la base al momento del backup. Antes de restaurar la app guarda la base actual, así podés volver atrás.</p>
+          <div id="rsBases"></div>
+          <h3 class="rs-h3">Colección musical</h3>
+          <div id="rsCol2"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- AJUSTES -->
+    <section class="vista" data-vista="ajustes">
+      <header class="cab"><div><h1>Ajustes e historial</h1><p class="sub" id="version"></p></div></header>
+      <div class="dos">
+        <div class="panel">
+          <h2>Carpetas</h2>
+          <div id="carpetas"></div>
+          <h2 class="sep">Teclas de Momento</h2>
+          <div class="teclas" id="teclas"></div>
+          <h2 class="sep">Reproductor</h2>
+          <label class="campo">Arrancar en
+            <select id="inicio"><option value="inicio">El principio</option><option value="seg">A unos segundos del inicio</option><option value="30">El 30 % del tema</option><option value="cue">El primer cue (si no tiene, el 30 %)</option></select>
+          </label>
+          <label class="campo">Segundos<input id="inicioSeg" type="number" min="0" max="600" step="5"></label>
+          <h2 class="sep">Claves de servicios (opcional)</h2>
+          <label class="campo">Last.fm<input id="lastfm" placeholder="Clave de API"></label>
+          <label class="campo">Discogs<input id="discogs" placeholder="Token personal"></label>
+          <label class="campo">Spotify Client ID<input id="spotify_id" placeholder="Para playlists de más de 100 temas"></label>
+          <label class="campo">Spotify Secret<input id="spotify_secret" type="password" placeholder="Client Secret"></label>
+          <div class="sp-con" id="spCon"></div>
+          <label class="campo">YouTube (clave API)<input id="youtube_key" placeholder="Para playlists de más de 100 videos"></label>
+          <p class="nota">Sin estas claves igual se pueden traer listas, hasta unos 100 temas. Las claves son gratis: Spotify en developer.spotify.com (crear una app) y YouTube en console.cloud.google.com (YouTube Data API v3).</p>
+        </div>
+        <div class="panel">
+          <h2>Historial</h2>
+          <p class="nota">Cada operación guarda su backup. Se deshacen en orden, de la más nueva a la más vieja, con Rekordbox cerrado.</p>
+          <div id="historial"></div>
+          <h2 class="sep">Limpieza de backups</h2>
+          <div id="backups"><p class="nota">Calculando tamaños…</p></div>
+        </div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<div class="modal" id="modal" hidden>
+  <div class="caja" role="dialog" aria-modal="true" aria-labelledby="modalTit">
+    <h2 id="modalTit"></h2>
+    <div id="modalCuerpo"></div>
+    <div class="acciones" id="modalAcc"></div>
+  </div>
+</div>
+<div class="aviso" id="aviso" hidden></div>
+<div class="ct-toast" id="ctToast" hidden></div>
+<datalist id="dl-genero"></datalist><datalist id="dl-grouping"></datalist><datalist id="dl-pais"></datalist><datalist id="dl-idioma"></datalist>
+<script src="app.js"></script>
+<script src="pasos.js"></script>
+<script src="respaldo.js"></script>
+<script src="cartelera.js"></script>
+</body>
+</html>
