@@ -18,7 +18,7 @@ echo "Python: $PY"
 mkdir -p "$DIR"
 rm -rf "$DIR/app"
 mkdir -p "$DIR/app"
-cp -R kramer web kramer_app.py "$DIR/app/"
+cp -R kramer web kramer_app.py kramer_arranque.py "$DIR/app/"
 
 if [ ! -x "$DIR/venv/bin/python" ]; then
   echo "Preparando el entorno (una sola vez)…"

@@ -85,6 +85,19 @@ function toastCartelera() {
 }
 setTimeout(chequearNovedades, 1200);
 
+async function chequearActualizacion() {
+  let d;
+  try { d = await api('/api/actualizacion'); } catch (_) { return; }
+  if (d.buscando) { setTimeout(chequearActualizacion, 3000); return; }
+  if (!d.lista) return;
+  const t = $('#actToast');
+  t.innerHTML = `<div><b>Actualización lista: versión ${esc(d.lista)}</b><small>Se instala sola la próxima vez que abras la app. Cuando puedas, cerrala y volvé a abrirla.</small></div><button type="button" class="ct-x" id="actCerrar" aria-label="Cerrar">×</button>`;
+  t.hidden = false;
+  $('#actCerrar').onclick = () => { t.hidden = true; };
+  setTimeout(() => { t.hidden = true; }, 20000);
+}
+setTimeout(chequearActualizacion, 3000);
+
 // ---------------------------------------------------------------- CARTELERA
 async function pintarCartelera(forzar) {
   $('#ctInicio').checked = !E.config || E.config.cartelera_inicio !== false;
