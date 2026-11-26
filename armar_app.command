@@ -3,7 +3,10 @@
 set -e
 cd "$(dirname "$0")"
 SRC="$(pwd)"
-LOG="$HOME/Downloads/kramer_build.txt"
+SALIDA="${KRAMER_SALIDA:-$HOME/Downloads}"
+mkdir -p "$SALIDA"
+LOG="$SALIDA/kramer_build.txt"
+VERSION="$(tr -d '[:space:]' < web/version.txt)"
 exec > >(tee "$LOG") 2>&1
 echo "=== Armando RKB Collection Manager.app ($(date)) ==="
 
@@ -45,7 +48,7 @@ rm -rf "$B/dist" "$B/work"
   "$SRC/kramer_ventana.py"
 
 APP="$B/dist/RKB Collection Manager.app"
-/usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString 0.8" "$APP/Contents/Info.plist" || true
+/usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $VERSION" "$APP/Contents/Info.plist" || true
 /usr/libexec/PlistBuddy -c "Add :LSMinimumSystemVersion string 12.0" "$APP/Contents/Info.plist" 2>/dev/null || true
 /usr/libexec/PlistBuddy -c "Add :NSHumanReadableCopyright string '© 2026 Guido · KRAMER DJ. Software libre (GPL-3.0). Hecha con la asistencia de Claude (Anthropic).'" "$APP/Contents/Info.plist" 2>/dev/null || true
 /usr/libexec/PlistBuddy -c "Add :NSAppleEventsUsageDescription string 'Para abrir carpetas en el Finder.'" "$APP/Contents/Info.plist" 2>/dev/null || true
@@ -62,19 +65,21 @@ codesign --verify --deep --strict "$APP" && echo "Firma OK" || echo "Aviso: revi
 "$APP/Contents/MacOS/RKB Collection Manager" --mytags --help >/dev/null 2>&1 && echo "Prueba interna OK" || echo "Aviso: la prueba interna no respondió (sigo igual)"
 "$APP/Contents/MacOS/RKB Collection Manager" --version || echo "Aviso: la app no informó su versión (sigo igual)"
 
-# 5) reemplazar la versión anterior y dejar un zip para compartir
+# 5) zip para compartir: lleva la app y las instrucciones de instalación
+rm -f "$SALIDA/RKB Collection Manager (Mac).zip"
+P="$B/paquete/RKB Collection Manager"; rm -rf "$B/paquete"; mkdir -p "$P"
+ditto "$APP" "$P/RKB Collection Manager.app"
+cp "$SRC/distribucion/LEEME Mac.txt" "$P/LEEME - Instalación.txt"
+ditto -c -k --keepParent "$P" "$SALIDA/RKB Collection Manager (Mac).zip"
+echo ""
+echo "Listo (versión $VERSION):"
+echo " · Para compartir: $SALIDA/RKB Collection Manager (Mac).zip"
+
+# 6) reemplazar la versión instalada en esta Mac (con KRAMER_SALIDA sólo se arma, no se instala)
+if [ -n "$KRAMER_SALIDA" ]; then exit 0; fi
 curl -s -m 1 -X POST http://127.0.0.1:8765/api/salir >/dev/null 2>&1 || true
 rm -rf "/Applications/Kramer DJ.app" "$HOME/Applications/Kramer DJ.app"   # versión vieja
 rm -rf "/Applications/RKB Collection Manager.app"
 ditto "$APP" "/Applications/RKB Collection Manager.app"
-rm -f "$HOME/Downloads/RKB Collection Manager (Mac).zip"
-# el zip para compartir lleva la app y las instrucciones de instalación
-P="$B/paquete/RKB Collection Manager"; rm -rf "$B/paquete"; mkdir -p "$P"
-ditto "$APP" "$P/RKB Collection Manager.app"
-cp "$SRC/distribucion/LEEME Mac.txt" "$P/LEEME - Instalación.txt"
-ditto -c -k --keepParent "$P" "$HOME/Downloads/RKB Collection Manager (Mac).zip"
-echo ""
-echo "Listo:"
 echo " · App: /Applications/RKB Collection Manager.app ($(du -sh "/Applications/RKB Collection Manager.app" | cut -f1))"
-echo " · Para compartir: ~/Downloads/RKB Collection Manager (Mac).zip"
 open "/Applications/RKB Collection Manager.app"

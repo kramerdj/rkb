@@ -1,0 +1,101 @@
+name: Publicar versión
+
+on:
+  workflow_dispatch:
+    inputs:
+      publicar:
+        description: "Publicar como versión nueva en Releases. Sin tildar, sólo arma la app y la deja en esta corrida."
+        type: boolean
+        default: false
+  pull_request:
+    paths:
+      - ".github/workflows/publicar.yml"
+      - "armar_app.command"
+      - "armar_app_windows.ps1"
+      - "kramer_ventana.py"
+      - "kramer_arranque.py"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: publicar-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  version:
+    runs-on: ubuntu-24.04
+    outputs:
+      version: ${{ steps.leer.outputs.version }}
+    steps:
+      - uses: actions/checkout@v7
+      - id: leer
+        name: Leer la versión de web/version.txt
+        run: echo "version=$(tr -d '[:space:]' < web/version.txt)" >> "$GITHUB_OUTPUT"
+      - name: Frenar si esa versión ya está publicada
+        if: github.event_name == 'workflow_dispatch' && inputs.publicar
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.leer.outputs.version }}
+        run: |
+          if gh release view "v$VERSION" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "::error::La versión $VERSION ya está publicada. Subí el número en web/version.txt y volvé a correr."
+            exit 1
+          fi
+
+  mac:
+    needs: version
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v7
+      - name: Armar la app para Mac
+        env:
+          KRAMER_SALIDA: ${{ runner.temp }}/salida
+        run: ./armar_app.command
+      - name: Poner el nombre de descarga
+        run: mv "$RUNNER_TEMP/salida/RKB Collection Manager (Mac).zip" "$RUNNER_TEMP/RKB-Collection-Manager-Mac.zip"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: mac
+          path: ${{ runner.temp }}/RKB-Collection-Manager-Mac.zip
+          if-no-files-found: error
+
+  windows:
+    needs: version
+    runs-on: windows-2025
+    steps:
+      - uses: actions/checkout@v7
+      - name: Armar la app para Windows
+        shell: powershell
+        env:
+          KRAMER_SALIDA: ${{ runner.temp }}\salida
+        run: powershell -NoProfile -ExecutionPolicy Bypass -File armar_app_windows.ps1
+      - name: Poner el nombre de descarga
+        shell: powershell
+        run: Move-Item "$env:RUNNER_TEMP\salida\RKB Collection Manager (Windows).zip" "$env:RUNNER_TEMP\RKB-Collection-Manager-Windows.zip"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: windows
+          path: ${{ runner.temp }}\RKB-Collection-Manager-Windows.zip
+          if-no-files-found: error
+
+  release:
+    if: github.event_name == 'workflow_dispatch' && inputs.publicar
+    needs: [version, mac, windows]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          path: salida
+          merge-multiple: true
+      - name: Crear la versión en Releases
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ needs.version.outputs.version }}
+        run: |
+          gh release create "v$VERSION" \
+            salida/RKB-Collection-Manager-Mac.zip salida/RKB-Collection-Manager-Windows.zip \
+            --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
+            --title "RKB Collection Manager $VERSION" --generate-notes
