@@ -5,7 +5,7 @@ Lo lee Claude Code al abrir el proyecto. Mantenelo al día cuando cambie algo im
 ## Quiénes y cómo
 
 - Dueño del producto: **Guido (KRAMER DJ)**, DJ de eventos en Argentina. **No es programador**: hablale en castellano rioplatense, simple, sin jerga; explicá qué cambia para el usuario, no cómo está hecho.
-- Colabora **Mauro** (ingeniero de software), que administra la organización `kramerdj` en GitHub. Los cambios entran por pull request a `main`.
+- Colabora **Mauro** (ingeniero de software), que administra la organización `kramerdj` en GitHub. Guido decide: los cambios se suben directo a `main`, sin esperar revisión de Mauro.
 - Toda la interfaz, los mensajes y los comentarios del código están en castellano (voseo). El inglés como idioma de la interfaz está pendiente (ver abajo).
 
 ## Qué es
