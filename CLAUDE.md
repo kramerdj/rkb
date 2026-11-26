@@ -28,7 +28,7 @@ kramer/
   oc.py                  motor de metadata (MusicBrainz, Wikidata, iTunes, Deezer, Last.fm, Discogs, CAA)
   lista.py / streaming.py  paso 1: leer listas y links (Spotify, YouTube, Deezer); crear playlist en Spotify (PKCE)
   respaldo.py            backup completo (zip de la base + copia espejo de la colección) y restauración
-  nube.py                Cartelera / Mis anuncios / versión mínima contra Supabase (apagado si URL/CLAVE vacías)
+  nube.py                Cartelera / Mis anuncios contra Supabase (apagado si URL/CLAVE vacías) + versión mínima desde GitHub
   plataforma.py          diferencias Mac/Windows (carpetas, abrir/mostrar archivos)
   config.py              config.json por usuario (Mac: ~/Library/Application Support/KramerDJ, Win: %APPDATA%\KramerDJ)
   trabajos.py            tareas largas en segundo plano con progreso
@@ -37,7 +37,9 @@ supabase.sql             esquema y permisos del servidor (se puede correr más d
 web/version.txt          ÚNICA fuente de la versión (la leen la app, los scripts y el pipeline)
 tests/                   pruebas sin Rekordbox: python -m unittest discover -s tests -v
   herramientas/supabase_simulado.py  servidor de prueba para Cartelera y Mis anuncios
-.github/workflows/       pruebas.yml (cada push y PR) · publicar.yml (armado Mac+Windows y Release, a mano)
+.github/workflows/       pruebas.yml (cada push y PR) · publicar.yml (armado Mac+Windows, paquete firmado y Release, a mano)
+                         · obligar.yml (obligar a actualizar / liberar, a mano)
+control/versiones.json   última versión y versión mínima obligatoria (la leen las apps instaladas)
 ```
 
 ## Reglas que no se rompen
@@ -67,15 +69,16 @@ tests/                   pruebas sin Rekordbox: python -m unittest discover -s t
 - Windows: `armar_app_windows.bat` → `armar_app_windows.ps1` (PyInstaller onefile .exe, WebView2). Reintenta copias porque Defender bloquea el .exe recién creado.
 - Con `KRAMER_SALIDA` los dos scripts dejan el zip y el registro en esa carpeta y no instalan ni abren la app (así corren en GitHub).
 - Publicar: subir `web/version.txt`, y en GitHub **Actions → Publicar versión → Run workflow** con «Publicar» tildado → arma Mac (macos-15) y Windows (windows-2025) y crea la Release `vX.Y` con `RKB-Collection-Manager-Mac.zip` y `RKB-Collection-Manager-Windows.zip` (nombres fijos: los botones del sitio apuntan ahí). Sin tildar, sólo arma (sirve para probar).
-- Actualizaciones del código sin reinstalar: `publicar_actualizacion.py armar` firma un paquete con kramer/ + web/. La clave privada va SIEMPRE fuera del proyecto y nunca al repositorio; si se pierde, las apps instaladas dejan de aceptar actualizaciones. `KRAMER_ACTUALIZACION_URL` / `KRAMER_ACTUALIZACION_CLAVE` lo activan.
+- Actualizaciones del código sin reinstalar (desde la 0.9.1): «Publicar versión» también firma un paquete con kramer/ + web/ (`publicar_actualizacion.py armar`) y sube `codigo-X.zip` + `manifiesto.json` a la Release. La app **armada** los busca en `releases/latest/download` (`URL_DEFECTO`/`CLAVE_DEFECTO` en `kramer_arranque.py`); corriendo desde el código fuente está apagado salvo con `KRAMER_ACTUALIZACION_URL` / `KRAMER_ACTUALIZACION_CLAVE`. La clave privada está en el secreto de GitHub `ACTUALIZACION_CLAVE_PRIVADA` y Guido guarda una copia de respaldo; nunca va al repositorio. Si se pierde, las apps instaladas dejan de aceptar actualizaciones. Si un cambio toca algo fuera de kramer/ y web/ (librerías, kramer_arranque.py, kramer_ventana.py), subir `SHELL` en `kramer_arranque.py`: las apps viejas no toman ese paquete y hay que reinstalar (y conviene hacerla obligatoria).
+- Versión obligatoria: `control/versiones.json` en `main` (ultima, minima, minima_desde, gracia_dias, mensaje), que la app lee de raw.githubusercontent.com (`nube.CONTROL_URL`). Lo cambian «Publicar versión» (tilde «Obligatoria») y el botón **Actions → Versión obligatoria** (`control/control.py`). Sin internet o si el archivo no se puede leer, **nunca bloquea** (pedido de Guido). La tabla `app_config` de Supabase ya no se usa para esto.
 
 ## Estado y pendientes (26 de noviembre de 2026)
 
-- Versión 0.9 en prueba piloto con DJs conocidos, repartida a mano (Google Drive). En la 0.9 se quitó la pestaña «Eventos tocados» (el filtro «Tocado» de Colección sigue). Guido usa una Mac con chip Apple (Rekordbox 7) y una PC con Windows 11.
+- Versión 0.9.1 en prueba piloto con DJs conocidos; se reparte desde https://kramerdj.github.io/ (repo `kramerdj/kramerdj.github.io`, botones a `releases/latest`, la versión se lee sola de GitHub). La 0.9.1 es la primera con actualización automática y control de versión: quien tenga 0.8 o 0.9 tiene que reinstalar una vez. En la 0.9 se quitó la pestaña «Eventos tocados» (el filtro «Tocado» de Colección sigue). Guido usa una Mac con chip Apple (Rekordbox 7) y una PC con Windows 11.
 - Windows: la primera compilación en la PC de Guido armó el .exe bien; falló sólo el zip final porque Defender tenía el .exe tomado. Corregido en `armar_app_windows.ps1` (cierra el .exe de prueba, reintenta y arma el zip desde la copia de trabajo).
 - Pipeline: confirmar que «Publicar versión» arma bien Mac y Windows (correrlo sin tildar «Publicar») antes de la primera Release.
-- Las Releases de un repositorio privado no se pueden bajar sin cuenta: para repartir desde GitHub hace falta repo público (o seguir con Drive).
-- **Supabase todavía no creado**: Cartelera, Mis anuncios y versión obligatoria están apagados hasta cargar URL/CLAVE en `nube.py`. Para activarlo: crear el proyecto (plan gratis), correr `supabase.sql`, cambiar la plantilla del email «Magic Link» para que mande el código (`{{ .Token }}`), entrar una vez desde la app con el email de Guido y marcarlo admin (`update perfiles set admin = true where email = …`). Probar la interfaz sin servidor real con `tests/herramientas/supabase_simulado.py`.
+- El repositorio `kramerdj/rkb` es público: las Releases se bajan sin cuenta.
+- **Supabase todavía no creado**: Cartelera y Mis anuncios están apagados hasta cargar URL/CLAVE en `nube.py`. Para activarlo: crear el proyecto (plan gratis), correr `supabase.sql`, cambiar la plantilla del email «Magic Link» para que mande el código (`{{ .Token }}`), entrar una vez desde la app con el email de Guido y marcarlo admin (`update perfiles set admin = true where email = …`). Probar la interfaz sin servidor real con `tests/herramientas/supabase_simulado.py`.
 - Spotify: cada usuario crea su propia app de desarrollador (guía dentro de la app). El modo desarrollo exige Premium y admite pocos usuarios por app, por eso no se comparte un Client ID.
 - Pendientes pedidos por Guido:
   - Interfaz en **inglés** (selector de idioma). Todo el texto está hoy en castellano dentro de html/js/py.

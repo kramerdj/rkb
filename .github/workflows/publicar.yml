@@ -7,6 +7,18 @@ on:
         description: "Publicar como versión nueva en Releases. Sin tildar, sólo arma la app y la deja en esta corrida."
         type: boolean
         default: false
+      obligatoria:
+        description: "Obligatoria: las versiones anteriores dejan de funcionar cuando pasan los días de gracia."
+        type: boolean
+        default: false
+      dias_gracia:
+        description: "Días de gracia (sólo si es obligatoria)."
+        type: number
+        default: 7
+      mensaje:
+        description: "Qué trae la versión nueva (se muestra en el aviso de la app). Opcional."
+        type: string
+        default: ""
   pull_request:
     paths:
       - ".github/workflows/publicar.yml"
@@ -40,6 +52,15 @@ jobs:
         run: |
           if gh release view "v$VERSION" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
             echo "::error::La versión $VERSION ya está publicada. Subí el número en web/version.txt y volvé a correr."
+            exit 1
+          fi
+      - name: Frenar si falta la clave de las actualizaciones
+        if: github.event_name == 'workflow_dispatch' && inputs.publicar
+        env:
+          CLAVE: ${{ secrets.ACTUALIZACION_CLAVE_PRIVADA }}
+        run: |
+          if [ -z "$CLAVE" ]; then
+            echo "::error::Falta el secreto ACTUALIZACION_CLAVE_PRIVADA (Settings → Secrets and variables → Actions)."
             exit 1
           fi
 
@@ -86,16 +107,44 @@ jobs:
     permissions:
       contents: write
     steps:
+      - uses: actions/checkout@v7
       - uses: actions/download-artifact@v8
         with:
-          path: salida
+          path: ${{ runner.temp }}/salida
           merge-multiple: true
+      - name: Firmar la actualización automática
+        env:
+          CLAVE: ${{ secrets.ACTUALIZACION_CLAVE_PRIVADA }}
+        run: |
+          python3 -m pip install --quiet pynacl
+          umask 077
+          printf '%s\n' "$CLAVE" > "$RUNNER_TEMP/clave.txt"
+          python3 publicar_actualizacion.py armar --clave-privada "$RUNNER_TEMP/clave.txt" --salida "$RUNNER_TEMP/paquete"
+          rm -f "$RUNNER_TEMP/clave.txt"
       - name: Crear la versión en Releases
         env:
           GH_TOKEN: ${{ github.token }}
           VERSION: ${{ needs.version.outputs.version }}
         run: |
           gh release create "v$VERSION" \
-            salida/RKB-Collection-Manager-Mac.zip salida/RKB-Collection-Manager-Windows.zip \
+            "$RUNNER_TEMP/salida/RKB-Collection-Manager-Mac.zip" "$RUNNER_TEMP/salida/RKB-Collection-Manager-Windows.zip" \
+            "$RUNNER_TEMP/paquete/codigo-$VERSION.zip" "$RUNNER_TEMP/paquete/manifiesto.json" \
             --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
             --title "RKB Collection Manager $VERSION" --generate-notes
+      - name: Avisar a las apps instaladas (control/versiones.json)
+        env:
+          VERSION: ${{ needs.version.outputs.version }}
+          OBLIGATORIA: ${{ inputs.obligatoria }}
+          DIAS: ${{ inputs.dias_gracia }}
+          MENSAJE: ${{ inputs.mensaje }}
+        run: |
+          git fetch --depth=1 origin main
+          git checkout -B main origin/main
+          extra=()
+          if [ "$OBLIGATORIA" = "true" ]; then extra+=(--obligatoria --dias "$DIAS"); fi
+          python3 control/control.py publicada "$VERSION" --mensaje "$MENSAJE" "${extra[@]}"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add control/versiones.json
+          git diff --cached --quiet || git commit -m "Versión $VERSION publicada"
+          git push origin main

@@ -45,9 +45,9 @@ async function chequearNovedades() {
   CT.nov = d; CT.activo = !!d.activo; CT.nuevos = d.nuevos || 0;
   if (d.ubicacion) CT.ubic = d.ubicacion;
   pintarMenu();
-  if (!d.activo || d.offline) return;
-  if (d.bloqueo) { bloquearPorVersion(d); return; }
-  if (d.hayNueva) {
+  if (d.auto === 'buscando' && (CT.esperas = (CT.esperas || 0) + 1) < 20) { setTimeout(chequearNovedades, 3000); return; }
+  if (d.bloqueo) { bloquearPorVersion(d); return; }       // sin internet no llega acá: nunca se bloquea offline
+  if (d.hayNueva && d.auto !== 'lista') {
     let visto = '';
     try { visto = localStorage.getItem('rkb_version_avisada') || ''; } catch (_) { /* nada */ }
     if (d.diasGracia != null || visto !== d.ultima) {
@@ -62,6 +62,13 @@ function bloquearPorVersion(d) {
   audio.pause();
   const b = document.createElement('div');
   b.className = 'bloqueo';
+  if (d.auto === 'lista') {
+    b.innerHTML = `<div class="caja"><h2>Falta un paso para actualizar</h2><p>La versión <b>${esc(d.ultima)}</b> ya se bajó. Cerrá la app y volvé a abrirla para empezar a usarla.</p><p class="nota">Tu colección, tus ajustes y tus backups no se tocan.</p>
+      <div class="acciones"><button type="button" class="btn prim" id="blSalir">Cerrar la app</button></div></div>`;
+    document.body.appendChild(b);
+    b.querySelector('#blSalir').onclick = salir;
+    return;
+  }
   b.innerHTML = `<div class="caja"><h2>Hay que actualizar la app</h2><p>Esta versión (${esc(d.actual)}) ya no se puede usar: hace falta la <b>${esc(d.ultima)}</b> o más nueva.</p>${d.mensaje ? `<p class="nota">${esc(d.mensaje)}</p>` : ''}<p class="nota">Bajala, reemplazá la app y volvé a abrirla. Tu colección, tus ajustes y tus backups no se tocan.</p>
     <div class="acciones"><button type="button" class="btn" id="blSalir">Cerrar la app</button><button type="button" class="btn prim" id="blBajar">Descargar la nueva versión</button></div></div>`;
   document.body.appendChild(b);

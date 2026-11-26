@@ -18,8 +18,13 @@ import zipfile
 from pathlib import Path
 
 SHELL = 1
-URL_BASE = os.environ.get("KRAMER_ACTUALIZACION_URL", "")
-CLAVE_PUBLICA = os.environ.get("KRAMER_ACTUALIZACION_CLAVE", "")
+# Las actualizaciones se publican como archivos de la última versión en GitHub (Actions → Publicar versión).
+# Sólo la app armada se actualiza sola; corriendo desde el código fuente, sólo si se pide con las variables.
+URL_DEFECTO = "https://github.com/kramerdj/rkb/releases/latest/download"
+CLAVE_DEFECTO = "9f17b8263b10b686e3af37ecbec32bff7e9ca68f0c9a9139a300bb704a8b9973"
+_ARMADA = bool(getattr(sys, "frozen", False))
+URL_BASE = os.environ.get("KRAMER_ACTUALIZACION_URL", URL_DEFECTO if _ARMADA else "")
+CLAVE_PUBLICA = os.environ.get("KRAMER_ACTUALIZACION_CLAVE", CLAVE_DEFECTO if _ARMADA else "")
 
 INCLUIDO = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parent))
 VERSION_INCLUIDA = (INCLUIDO / "web" / "version.txt").read_text(encoding="utf-8").strip()

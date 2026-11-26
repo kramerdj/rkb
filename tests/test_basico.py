@@ -20,6 +20,7 @@ sys.path.insert(0, str(RAIZ))
 TMP = Path(tempfile.mkdtemp(prefix="rkb-test-"))
 os.environ["KRAMER_APP_DIR"] = str(TMP / "app")           # nunca toca la configuración real
 os.environ.pop("KRAMER_NUBE_URL", None)
+os.environ["KRAMER_CONTROL_URL"] = ""                   # no consulta GitHub en las pruebas
 
 from kramer import categorias, config, lista, nombres, nube, respaldo  # noqa: E402
 
@@ -144,6 +145,31 @@ class Cartelera(unittest.TestCase):
     def test_apagada_sin_servidor(self):
         self.assertFalse(nube.configurado())
         self.assertEqual(nube.novedades("0.8"), {"activo": False})
+
+    def control(self, d):
+        """Simula el archivo control/versiones.json de GitHub (None = sin internet)."""
+        viejos = nube._control, nube.CONTROL_URL
+        nube._control, nube.CONTROL_URL = (lambda forzar: d), "https://ejemplo"
+        self.addCleanup(lambda: (setattr(nube, "_control", viejos[0]), setattr(nube, "CONTROL_URL", viejos[1])))
+
+    def test_sin_internet_no_bloquea(self):
+        self.control(None)
+        self.assertEqual(nube.novedades("0.1"), {"activo": False, "offline": True})
+
+    def test_version_obligatoria(self):
+        import datetime
+        hoy = datetime.date.today()
+        self.control({"ultima": "0.9.2", "minima": "0.9.2", "gracia_dias": 7,
+                      "minima_desde": (hoy - datetime.timedelta(days=3)).isoformat()})
+        d = nube.novedades("0.9.1")
+        self.assertTrue(d["hayNueva"])
+        self.assertFalse(d["bloqueo"])
+        self.assertEqual(d["diasGracia"], 4)
+        self.control({"ultima": "0.9.2", "minima": "0.9.2", "gracia_dias": 7,
+                      "minima_desde": (hoy - datetime.timedelta(days=8)).isoformat()})
+        self.assertTrue(nube.novedades("0.9.1")["bloqueo"])
+        self.assertFalse(nube.novedades("0.9.2")["bloqueo"])
+        self.assertFalse(nube.novedades("0.10")["hayNueva"])
 
 
 class Respaldo(unittest.TestCase):

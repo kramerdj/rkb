@@ -1,4 +1,5 @@
-"""Conexión con el servidor de la app (Supabase): versión mínima, cartelera de eventos y "Mis anuncios".
+"""Conexión con el servidor de la app (Supabase): cartelera de eventos y "Mis anuncios".
+La versión mínima se lee de GitHub (control/versiones.json).
 
 Mientras URL/CLAVE estén vacías, todo esto queda apagado y la app funciona igual que antes.
 La CLAVE es la "anon public key" de Supabase: es pública a propósito (va dentro de la app).
@@ -85,25 +86,44 @@ def _num(v):
         return (0,)
 
 
-def novedades(version_actual, forzar=False):
-    """Lee la fila de configuración (última versión, mínima, gracia, links). Sin internet: no bloquea."""
-    if not configurado():
-        return {"activo": False}
+CONTROL_URL = os.environ.get("KRAMER_CONTROL_URL",
+                             "https://raw.githubusercontent.com/kramerdj/rkb/main/control/versiones.json")
+DESCARGA = "https://github.com/kramerdj/rkb/releases/latest/download/RKB-Collection-Manager-{}.zip"
+
+
+def _control(forzar):
+    """El archivo control/versiones.json de GitHub (None si no hay internet o no se puede leer)."""
     with _lock:
-        if not forzar and _cache["novedades"] and time.time() - _cache["cuando"] < 600:
-            d = _cache["novedades"]
-        else:
-            try:
-                filas = _pedir("GET", "/rest/v1/app_config?select=*&id=eq.1", timeout=5)
-                d = filas[0] if filas else {}
-            except ErrorNube:
-                return {"activo": True, "offline": True}
-            _cache.update(novedades=d, cuando=time.time())
+        if not forzar and _cache["novedades"] is not None and time.time() - _cache["cuando"] < 600:
+            return _cache["novedades"]
+    try:
+        r = requests.get(CONTROL_URL, timeout=5)
+        r.raise_for_status()
+        d = r.json()
+        if not isinstance(d, dict):
+            return None
+    except (requests.RequestException, ValueError):
+        return None
+    with _lock:
+        _cache.update(novedades=d, cuando=time.time())
+    return d
+
+
+def novedades(version_actual, forzar=False):
+    """Última versión y versión mínima obligatoria, según control/versiones.json en GitHub.
+    activo = si está la Cartelera (Supabase). Sin internet nunca bloquea: offline = True."""
+    res = {"activo": configurado()}
+    if not CONTROL_URL:
+        return res
+    d = _control(forzar)
+    if d is None:
+        return {**res, "offline": True}
     actual = _num(version_actual)
-    res = {"activo": True, "offline": False, "actual": version_actual, "ultima": d.get("ultima") or version_actual,
-           "mensaje": d.get("mensaje") or "", "link": d.get("link_win") if os.name == "nt" else d.get("link_mac"),
-           "hayNueva": _num(d.get("ultima") or "0") > actual, "bloqueo": False, "diasGracia": None}
-    res["link"] = res["link"] or d.get("link") or ""
+    ultima = str(d.get("ultima") or version_actual)
+    res.update(offline=False, actual=version_actual, ultima=ultima, mensaje=str(d.get("mensaje") or ""),
+               hayNueva=_num(ultima) > actual, bloqueo=False, diasGracia=None)
+    link = d.get("link_win") if os.name == "nt" else d.get("link_mac")
+    res["link"] = str(link or DESCARGA.format("Windows" if os.name == "nt" else "Mac"))
     minima = d.get("minima")
     if minima and _num(minima) > actual:
         desde = d.get("minima_desde") or datetime.date.today().isoformat()
@@ -112,7 +132,7 @@ def novedades(version_actual, forzar=False):
         except ValueError:
             limite = datetime.date.today()
         faltan = (limite - datetime.date.today()).days
-        res["minima"] = minima
+        res["minima"] = str(minima)
         res["bloqueo"] = faltan < 0
         res["diasGracia"] = max(faltan, 0)
     return res

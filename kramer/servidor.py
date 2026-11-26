@@ -626,6 +626,10 @@ def _nube(fn):
 def api_novedades(nube, q):
     forzar = bool(q.get("forzar"))
     d = nube.novedades(VERSION, forzar)
+    act = kramer_arranque.estado()
+    if d.get("hayNueva") and act["activo"]:
+        # la app armada baja sola el código nuevo: si ya está bajado, alcanza con cerrarla y abrirla
+        d["auto"] = "lista" if act["lista"] == d["ultima"] else "buscando" if act["buscando"] else ""
     if d.get("activo"):
         c = nube.cartelera(forzar)
         vistos = set(config.cargar().get("cartelera_vistos") or [])

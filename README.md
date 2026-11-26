@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <b>Versión 0.9 · beta</b> · Mac y Windows · Rekordbox 6 y 7 · GPL-3.0
+  <b>Versión 0.9.1 · beta</b> · Mac y Windows · Rekordbox 6 y 7 · GPL-3.0
 </p>
 
 ---
@@ -86,9 +86,19 @@ Cada sistema se arma en su propia computadora. El script de Mac además instala 
 
 No hace falta armar nada a mano: GitHub arma la app para Mac y para Windows y la publica.
 
-1. Subí el número en [`web/version.txt`](web/version.txt) (por ejemplo, de `0.8` a `0.9`) y guardá el cambio en `main`.
+1. Subí el número en [`web/version.txt`](web/version.txt) (por ejemplo, de `0.9.1` a `0.9.2`) y guardá el cambio en `main`.
 2. En GitHub, andá a **Actions → Publicar versión → Run workflow**, tildá «Publicar como versión nueva» y tocá **Run workflow**.
-3. En unos minutos la versión aparece en **Releases** con los dos zips. Los botones de descarga del sitio apuntan siempre a la última.
+   Si querés que sea obligatoria, tildá también «Obligatoria» y elegí los días de gracia.
+3. En unos minutos la versión aparece en **Releases** con los dos zips y el paquete de actualización firmado.
+   Los botones de descarga del sitio apuntan siempre a la última.
+
+Las apps instaladas (desde la 0.9.1) bajan solas el código nuevo y lo usan la próxima vez que se abren.
+Sólo hace falta reinstalar cuando cambia la base del programa (librerías, ícono, instalador).
+
+**Versión obligatoria:** [`control/versiones.json`](control/versiones.json) dice cuál es la última versión y cuál es la mínima.
+Para obligar a actualizar sin publicar nada nuevo (o para dejar de obligar): **Actions → Versión obligatoria → Run workflow**.
+Quien tenga una versión más vieja ve un aviso con los días que le quedan; cuando se terminan, la app se bloquea hasta que actualice.
+**Sin internet la app nunca se bloquea.**
 
 Si corrés el flujo sin tildar la opción, arma la app y deja los zips en esa corrida, sin publicar nada: sirve para probar.
 

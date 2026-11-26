@@ -38,7 +38,7 @@ def generar_clave(ruta):
     with os.fdopen(fd, "w", encoding="ascii") as f:
         f.write(clave.encode().hex() + "\n")
     print(f"Clave privada guardada en {ruta} (guardala bien y hacé una copia: no se puede recuperar).")
-    print(f"Clave pública, para CLAVE_PUBLICA en kramer_arranque.py: {clave.verify_key.encode().hex()}")
+    print(f"Clave pública, para CLAVE_DEFECTO en kramer_arranque.py: {clave.verify_key.encode().hex()}")
 
 
 def _archivos():
@@ -64,8 +64,9 @@ def armar_zip():
 def armar(ruta_clave, salida, shell):
     clave = SigningKey(bytes.fromhex(_fuera_del_proyecto(ruta_clave).read_text(encoding="ascii").strip()))
     publica = clave.verify_key.encode().hex()
-    if kramer_arranque.CLAVE_PUBLICA and publica != kramer_arranque.CLAVE_PUBLICA:
-        sys.exit("Esa clave privada no corresponde a la CLAVE_PUBLICA de kramer_arranque.py: las apps rechazarían el paquete.")
+    esperada = kramer_arranque.CLAVE_PUBLICA or kramer_arranque.CLAVE_DEFECTO
+    if esperada and publica != esperada:
+        sys.exit("Esa clave privada no corresponde a la clave pública de kramer_arranque.py: las apps rechazarían el paquete.")
     version = (RAIZ / "web" / "version.txt").read_text(encoding="utf-8").strip()
     datos = armar_zip()
     manifiesto = json.dumps({"version": version, "shell": shell, "sha256": hashlib.sha256(datos).hexdigest(),
@@ -84,7 +85,7 @@ def armar(ruta_clave, salida, shell):
     print(f" · codigo-{version}.zip  sha256 {hashlib.sha256(datos).hexdigest()}")
     print(" · manifiesto.json")
     print(f"Clave pública que lo firma: {publica}")
-    print("Subí primero el zip y después manifiesto.json a la carpeta de KRAMER_ACTUALIZACION_URL.")
+    print("Subí primero el zip y después manifiesto.json a la última versión publicada (URL_DEFECTO).")
 
 
 def main():
