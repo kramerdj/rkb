@@ -1,0 +1,29 @@
+# Pruebas automáticas en cada cambio (push a main y pull requests).
+# El armado y la publicación de versiones están en publicar.yml.
+name: Pruebas
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pruebas-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  pruebas:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - name: Librerías
+        run: |
+          python3 -m venv .venv
+          .venv/bin/pip install -q -r requirements.txt
+      - name: Pruebas (sin Rekordbox ni música)
+        run: .venv/bin/python -m unittest discover -s tests -v
+      - name: Revisar la interfaz (JavaScript)
+        run: for f in web/*.js; do node --check "$f"; done

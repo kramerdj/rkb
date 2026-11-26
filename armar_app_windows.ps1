@@ -69,15 +69,25 @@ with zipfile.ZipFile(z, 'w', zipfile.ZIP_DEFLATED) as zf:
   if ($p.WaitForExit(60000) -and $p.ExitCode -eq 0) { Write-Host "Prueba interna OK" } else { Write-Host "Aviso: la prueba interna no respondió (sigo igual)" }
   $version = (& $EXE --version | Out-String).Trim()
   if ($version) { Write-Host $version } else { Write-Host "Aviso: la app no informó su versión (sigo igual)" }
+  # que no quede nada abierto del .exe de prueba
+  Get-Process -Name "RKB Collection Manager" -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+  Start-Sleep -Seconds 2
 
   # 5) dejar el .exe y un zip para compartir en Descargas
+  # Windows Defender suele revisar el .exe recién creado y lo deja "en uso" unos segundos: se reintenta.
+  function Reintentar([scriptblock]$accion, [string]$que) {
+    for ($i = 1; $i -le 10; $i++) {
+      try { & $accion; return } catch { if ($i -eq 10) { throw "$que`: $_" }; Write-Host "  ($que en uso, reintento en 3 s...)"; Start-Sleep -Seconds 3 }
+    }
+  }
   $FINAL = Join-Path $DESC "RKB Collection Manager.exe"
-  Copy-Item $EXE $FINAL -Force
+  Reintentar { Copy-Item $EXE $FINAL -Force -ErrorAction Stop } "Copiar el .exe"
   $ZIPW = Join-Path $DESC "RKB Collection Manager (Windows).zip"
   Remove-Item $ZIPW -ErrorAction SilentlyContinue
   $LEEME = Join-Path $B "LEEME - Instalación.txt"
   Copy-Item (Join-Path $SRC "distribucion\LEEME Windows.txt") $LEEME -Force
-  Compress-Archive -Path $FINAL, $LEEME -DestinationPath $ZIPW
+  # el zip se arma desde la copia de trabajo (no desde la que está revisando el antivirus)
+  Reintentar { Compress-Archive -Path $EXE, $LEEME -DestinationPath $ZIPW -Force -ErrorAction Stop } "Armar el zip"
   $MB = [math]::Round((Get-Item $FINAL).Length / 1MB)
   Write-Host ""
   Write-Host "Listo:"

@@ -1,0 +1,10 @@
+# Librerías de la app (las mismas que instalan los scripts de armado; sirven para desarrollo y pruebas)
+pywebview
+pyrekordbox==0.5.0
+mutagen
+requests
+numpy
+pillow
+imageio-ffmpeg
+pynacl
+psutil

@@ -80,9 +80,9 @@ from PIL import Image
 # =============================================================================
 # CONFIGURACIÓN
 # =============================================================================
-COLECCION = "/Users/guido/Documents/rekordbox/Kramer DJ"
+COLECCION = os.path.expanduser("~/Music")
 CARPETA_BACKUP = "_BACKUP originales"     # nombre de la carpeta de backups (el script nunca la analiza)
-BACKUP_RAIZ = "/Users/guido/Documents/backup/_BACKUP originales"   # fuera de la colección
+BACKUP_RAIZ = os.path.expanduser("~/Documents/backup/_BACKUP originales")   # fuera de la colección
 
 
 def carpeta_backup(coleccion):
