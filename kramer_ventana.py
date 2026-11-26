@@ -2,11 +2,18 @@
 import os
 import sys
 
+import kramer_arranque
+
+if len(sys.argv) > 1 and sys.argv[1] == "--version":
+    kramer_arranque.preparar()
+    from kramer import servidor
+    print(f"RKB Collection Manager {servidor.VERSION} · código {kramer_arranque.estado()['origen']} · {servidor.RAIZ}")
+    sys.exit(0)
+
 if getattr(sys, "frozen", False) or sys.stdout is None or sys.stderr is None:
     # La app armada no tiene consola: los mensajes y errores van a un registro (sirve para «Reportar un problema»).
     try:
-        from kramer import plataforma
-        _d = plataforma.dir_app()
+        _d = kramer_arranque.DIR_APP
         _d.mkdir(parents=True, exist_ok=True)
         if (_d / "registro.txt").exists():
             os.replace(_d / "registro.txt", _d / "registro-anterior.txt")
@@ -14,6 +21,8 @@ if getattr(sys, "frozen", False) or sys.stdout is None or sys.stderr is None:
     except Exception:
         _reg = open(os.devnull, "w")
     sys.stdout = sys.stderr = _reg
+
+kramer_arranque.preparar()
 
 if len(sys.argv) > 1 and sys.argv[1] == "--mytags":
     # la app se llama a sí misma para correr My Tags en un proceso aparte
@@ -33,6 +42,7 @@ def main():
     srv = servidor.crear(0)                       # puerto libre cualquiera
     puerto = srv.server_address[1]
     threading.Thread(target=srv.serve_forever, daemon=True).start()
+    kramer_arranque.buscar()
 
     ventana = webview.create_window(
         "RKB Collection Manager", f"http://127.0.0.1:{puerto}/", width=1440, height=900,

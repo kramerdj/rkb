@@ -20,8 +20,8 @@ if [ ! -x "$B/venv/bin/python" ]; then
   "$UV" venv --python 3.13 "$B/venv"
 fi
 echo "Instalando librerías…"
-"$UV" pip install --python "$B/venv/bin/python" -q pyinstaller pywebview pyrekordbox mutagen requests numpy pillow imageio-ffmpeg
-"$B/venv/bin/python" -c "import webview, pyrekordbox, mutagen, PyInstaller, requests, PIL, imageio_ffmpeg; print('Librerías OK', pyrekordbox.__version__)"
+"$UV" pip install --python "$B/venv/bin/python" -q pyinstaller pywebview pyrekordbox mutagen requests numpy pillow imageio-ffmpeg pynacl psutil
+"$B/venv/bin/python" -c "import webview, pyrekordbox, mutagen, PyInstaller, requests, PIL, imageio_ffmpeg, nacl, psutil; print('Librerías OK', pyrekordbox.__version__)"
 
 # 2) ícono
 T="$B/Kramer.iconset"; rm -rf "$T"; mkdir -p "$T"
@@ -33,14 +33,14 @@ iconutil -c icns "$T" -o "$B/Kramer.icns"
 
 # 2b) código fuente adentro de la app (la licencia GPL pide compartirlo junto con la app)
 rm -f "$B/codigo-fuente.zip"
-(cd "$SRC" && zip -qr "$B/codigo-fuente.zip" kramer web kramer_ventana.py kramer_app.py armar_app.command armar_app_windows.bat armar_app_windows.ps1 supabase.sql distribucion icono.png -x '*__pycache__*' '*.pyc')
+(cd "$SRC" && zip -qr "$B/codigo-fuente.zip" kramer web kramer_ventana.py kramer_app.py kramer_arranque.py publicar_actualizacion.py armar_app.command armar_app_windows.bat armar_app_windows.ps1 supabase.sql distribucion icono.png -x '*__pycache__*' '*.pyc')
 
 # 3) armado
 rm -rf "$B/dist" "$B/work"
 "$B/venv/bin/pyinstaller" --noconfirm --log-level WARN --windowed --name "RKB Collection Manager" \
   --icon "$B/Kramer.icns" --osx-bundle-identifier ar.kramerdj.rkbcollectionmanager \
   --add-data "$SRC/web:web" --add-data "$B/codigo-fuente.zip:." --paths "$SRC" \
-  --collect-all pyrekordbox --collect-all sqlcipher3 --collect-all imageio_ffmpeg --collect-submodules kramer \
+  --collect-all pyrekordbox --collect-all sqlcipher3 --collect-all imageio_ffmpeg --collect-submodules kramer --hidden-import _cffi_backend \
   --distpath "$B/dist" --workpath "$B/work" --specpath "$B" \
   "$SRC/kramer_ventana.py"
 
@@ -60,6 +60,7 @@ codesign --verify --deep --strict "$APP" && echo "Firma OK" || echo "Aviso: revi
 
 # 4) prueba rápida: que arranque el motor (sin abrir ventana)
 "$APP/Contents/MacOS/RKB Collection Manager" --mytags --help >/dev/null 2>&1 && echo "Prueba interna OK" || echo "Aviso: la prueba interna no respondió (sigo igual)"
+"$APP/Contents/MacOS/RKB Collection Manager" --version || echo "Aviso: la app no informó su versión (sigo igual)"
 
 # 5) reemplazar la versión anterior y dejar un zip para compartir
 curl -s -m 1 -X POST http://127.0.0.1:8765/api/salir >/dev/null 2>&1 || true

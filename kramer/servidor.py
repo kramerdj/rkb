@@ -11,14 +11,16 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
+import kramer_arranque
+
 from . import archivos, config, historial, plataforma, rb, trabajos
 
 CONGELADA = getattr(sys, "frozen", False)          # True dentro de "Kramer DJ.app"
-RAIZ = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parent.parent))
+RAIZ = Path(kramer_arranque.estado()["carpeta"])
 WEB = RAIZ / "web"
 PUERTO = int(os.environ.get("KRAMER_PUERTO", "8765"))
 RUTAS = {}            # id de tema -> ruta del archivo (para el reproductor)
-VERSION = "0.8"
+VERSION = (WEB / "version.txt").read_text(encoding="utf-8").strip()
 EN_VENTANA = False        # lo pone kramer_ventana.py
 AL_SALIR = None           # callback para cerrar la ventana
 ELEGIR_CARPETA = None     # selector nativo de la ventana
@@ -334,7 +336,7 @@ def api_incorporar_quitar(b):
 def api_fuente(_):
     """Copia el código fuente de la app (requisito de la licencia GPL) a Descargas."""
     import shutil
-    origen = RAIZ / "codigo-fuente.zip"
+    origen = kramer_arranque.INCLUIDO / "codigo-fuente.zip"
     if not origen.is_file():
         raise Error("Esta versión no trae el código fuente adentro.")
     destino = plataforma.descargas() / f"RKB Collection Manager {VERSION} - codigo fuente.zip"
@@ -797,6 +799,7 @@ GET = {"/api/estado": api_estado, "/api/coleccion": api_coleccion, "/api/tema": 
        "/api/novedades": api_novedades, "/api/carpeta_sugerida": api_carpeta_sugerida, "/api/cartelera": api_cartelera, "/api/nube/quien": api_nube_quien,
        "/api/nube/mis": api_nube_mis, "/api/nube/pendientes": api_nube_pendientes,
        "/api/respaldo": api_respaldo, "/api/respaldo/share": api_respaldo_share,
+       "/api/actualizacion": lambda q: kramer_arranque.estado(),
        "/api/ping": lambda q: {"ok": True}}
 POST = {"/api/pendiente": api_pendiente, "/api/pendiente_lote": api_pendiente_lote, "/api/descartar": api_descartar,
         "/api/sincronizar": api_sincronizar, "/api/traer": api_traer_aplicar,

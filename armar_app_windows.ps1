@@ -23,9 +23,9 @@ try {
   $PY = Join-Path $B "venv\Scripts\python.exe"
   if (-not (Test-Path $PY)) { & $UV venv --python 3.13 (Join-Path $B "venv") }
   Write-Host "Instalando librerías..."
-  & $UV pip install --python $PY -q pyinstaller pywebview pyrekordbox mutagen requests numpy pillow imageio-ffmpeg
+  & $UV pip install --python $PY -q pyinstaller pywebview pyrekordbox mutagen requests numpy pillow imageio-ffmpeg pynacl psutil
   if ($LASTEXITCODE -ne 0) { throw "Falló la instalación de librerías." }
-  & $PY -c "import webview, pyrekordbox, mutagen, PyInstaller, requests, PIL, imageio_ffmpeg, clr; print('Librerías OK', pyrekordbox.__version__)"
+  & $PY -c "import webview, pyrekordbox, mutagen, PyInstaller, requests, PIL, imageio_ffmpeg, clr, nacl, psutil; print('Librerías OK', pyrekordbox.__version__)"
   if ($LASTEXITCODE -ne 0) { throw "Falta alguna librería (mirá el mensaje de arriba)." }
 
   # 2) ícono .ico y código fuente adentro (la licencia GPL pide compartirlo junto con la app)
@@ -43,7 +43,7 @@ with zipfile.ZipFile(z, 'w', zipfile.ZIP_DEFLATED) as zf:
             for f in files:
                 if not f.endswith('.pyc'):
                     p = os.path.join(base, f); zf.write(p, os.path.relpath(p, src))
-    for f in ('kramer_ventana.py', 'kramer_app.py', 'armar_app.command', 'armar_app_windows.bat', 'armar_app_windows.ps1', 'supabase.sql', 'icono.png'):
+    for f in ('kramer_ventana.py', 'kramer_app.py', 'kramer_arranque.py', 'publicar_actualizacion.py', 'armar_app.command', 'armar_app_windows.bat', 'armar_app_windows.ps1', 'supabase.sql', 'icono.png'):
         if os.path.exists(os.path.join(src, f)): zf.write(os.path.join(src, f), f)
 "@ $SRC $ICO $ZIP
   if ($LASTEXITCODE -ne 0) { throw "No se pudo preparar el ícono o el código fuente." }
@@ -55,7 +55,7 @@ with zipfile.ZipFile(z, 'w', zipfile.ZIP_DEFLATED) as zf:
   & $PYI --noconfirm --log-level WARN --onefile --windowed --name "RKB Collection Manager" `
     --icon $ICO --add-data "$SRC\web;web" --add-data "$ZIP;." --paths $SRC `
     --collect-all pyrekordbox --collect-all sqlcipher3 --collect-all imageio_ffmpeg --collect-all webview `
-    --collect-submodules kramer --hidden-import clr `
+    --collect-submodules kramer --hidden-import clr --hidden-import _cffi_backend `
     --distpath $DIST --workpath $WORK --specpath $B `
     (Join-Path $SRC "kramer_ventana.py")
   if ($LASTEXITCODE -ne 0) { throw "Falló PyInstaller (mirá los mensajes de arriba)." }
@@ -65,6 +65,8 @@ with zipfile.ZipFile(z, 'w', zipfile.ZIP_DEFLATED) as zf:
   # 4) prueba rápida del motor (sin abrir ventana)
   $p = Start-Process -FilePath $EXE -ArgumentList "--mytags","--help" -PassThru -WindowStyle Hidden
   if ($p.WaitForExit(60000) -and $p.ExitCode -eq 0) { Write-Host "Prueba interna OK" } else { Write-Host "Aviso: la prueba interna no respondió (sigo igual)" }
+  $version = (& $EXE --version | Out-String).Trim()
+  if ($version) { Write-Host $version } else { Write-Host "Aviso: la app no informó su versión (sigo igual)" }
 
   # 5) dejar el .exe y un zip para compartir en Descargas
   $FINAL = Join-Path $DESC "RKB Collection Manager.exe"
