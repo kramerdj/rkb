@@ -514,14 +514,6 @@ def api_nombres_aplicar(b):
     return {**r, "mensaje": f"Listo: {r['renombrados']} archivos con nombre nuevo, también en Rekordbox."}
 
 
-def api_sesiones(_):
-    return {"sesiones": rb.sesiones()}
-
-
-def api_sesion(q):
-    return {"ids": rb.sesion(q.get("id", [""])[0])}
-
-
 def api_backups(_):
     from . import backups
     return backups.listar()
@@ -795,7 +787,7 @@ GET = {"/api/estado": api_estado, "/api/coleccion": api_coleccion, "/api/tema": 
        "/api/traer": api_traer_buscar, "/api/historial": api_historial,
        "/api/duplicados": api_duplicados, "/api/descargas": api_descargas, "/api/trabajo": api_trabajo,
        "/api/incorporar": api_incorporar_estado, "/api/chequeo": api_chequeo, "/api/mytags": api_mytags_listar,
-       "/api/sesiones": api_sesiones, "/api/nombres": api_nombres, "/api/spotify": api_spotify_estado, "/api/sesion": api_sesion, "/api/backups": api_backups,
+       "/api/nombres": api_nombres, "/api/spotify": api_spotify_estado, "/api/backups": api_backups,
        "/api/novedades": api_novedades, "/api/carpeta_sugerida": api_carpeta_sugerida, "/api/cartelera": api_cartelera, "/api/nube/quien": api_nube_quien,
        "/api/nube/mis": api_nube_mis, "/api/nube/pendientes": api_nube_pendientes,
        "/api/respaldo": api_respaldo, "/api/respaldo/share": api_respaldo_share,

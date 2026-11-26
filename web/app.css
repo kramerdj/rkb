@@ -295,15 +295,6 @@ main{flex:1;min-width:0;overflow:auto}
 .sg small{color:var(--gris);font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block}
 .sg .por{font-size:11px;color:var(--acento2);text-align:right;white-space:nowrap}
 /* eventos tocados */
-.ev-cuerpo{display:flex;gap:16px;flex:1;min-height:0}
-.ev-lista{flex:0 0 300px;overflow:auto;max-height:calc(100vh - 170px)}
-.ev-ses{display:flex;justify-content:space-between;gap:8px;padding:8px 10px;border-radius:8px;cursor:pointer;font-size:13px}
-.ev-ses:hover{background:var(--panel2)}.ev-ses.act{background:var(--acentoBg);color:var(--acento2)}
-.ev-ses small{color:var(--gris)}
-.ev-det{flex:1;min-width:0;overflow:auto;max-height:calc(100vh - 170px)}
-.ev-fila{display:grid;grid-template-columns:32px 30px minmax(0,1.4fr) minmax(0,1fr) 50px 44px 70px;gap:10px;align-items:center;padding:6px 4px;border-top:1px solid var(--linea);font-size:13px}
-.ev-fila span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.ev-fila .n{color:var(--gris);text-align:right}
 /* backups */
 .bk{display:grid;grid-template-columns:22px minmax(0,1fr) 80px 74px;gap:8px;align-items:center;padding:6px 0;border-top:1px solid var(--linea);font-size:12px}
 .bk span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}

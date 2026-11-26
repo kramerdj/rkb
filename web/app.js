@@ -42,7 +42,7 @@ const cerrarModal = () => { $('#modal').hidden = true; $('#modal .caja').classLi
 // ---------------------------------------------------------------- MENÚ
 const VISTAS = [
   ['lista', '1 · Lista de temas'], ['descargas', '2 · Descargas'], ['incorporar', '3 · Incorporar'],
-  ['mytags', '4 · My Tags'], ['coleccion', '5 · Colección'], ['-'], ['eventos', 'Eventos tocados'], ['cartelera', 'Cartelera'], ['misanuncios', 'Mis anuncios'], ['respaldos', 'Backup y restauración'], ['ajustes', 'Ajustes e historial'],
+  ['mytags', '4 · My Tags'], ['coleccion', '5 · Colección'], ['-'], ['cartelera', 'Cartelera'], ['misanuncios', 'Mis anuncios'], ['respaldos', 'Backup y restauración'], ['ajustes', 'Ajustes e historial'],
 ];
 function pintarMenu() {
   const n = nPend();
@@ -59,7 +59,6 @@ function irA(v) {
   document.querySelectorAll('.vista').forEach((s) => s.classList.toggle('act', s.dataset.vista === v));
   pintarMenu();
   if (v === 'ajustes') { pintarAjustes(); pintarBackups(); }
-  if (v === 'eventos') pintarEventos();
   if (v === 'acerca') api('/api/estado').then((d) => { $('#acVersion').textContent = 'Versión ' + d.version; });
   if (v === 'mytags') pintarMyTags();
   if (v === 'respaldos' && typeof pintarRespaldo === 'function') pintarRespaldo();
@@ -916,48 +915,6 @@ $('#sgLista').addEventListener('click', (e) => {
   seleccionar(id, true); verFila(id, 'center');
 });
 
-// ---------------------------------------------------------------- EVENTOS TOCADOS
-const EV = { sesiones: [], sel: null, tab: 'fechas' };
-async function pintarEventos() {
-  try { EV.sesiones = (await api('/api/sesiones')).sesiones; } catch (e) { $('#evLista').innerHTML = `<p class="nota">${esc(e.message)}</p>`; return; }
-  const nunca = E.temas.filter((t) => !t.tocado).length;
-  $('#evNunca').textContent = `Ver los ${nunca} nunca tocados en Colección`;
-  $('#evTabs').innerHTML = [['fechas', `Por fecha (${EV.sesiones.length})`], ['top', 'Los más tocados']].map(([k, l]) =>
-    `<button type="button" data-evt="${k}" class="${EV.tab === k ? 'act' : ''}">${l}</button>`).join('');
-  if (EV.tab === 'top') {
-    $('#evLista').hidden = true;
-    const top = [...E.temas].filter((t) => t.tocado).sort((a, b) => b.tocado - a.tocado).slice(0, 100);
-    pintarEvFilas('Los 100 más tocados', top, true);
-    return;
-  }
-  $('#evLista').hidden = false;
-  $('#evLista').innerHTML = EV.sesiones.map((s) => `<div class="ev-ses${EV.sel === s.id ? ' act' : ''}" data-ses="${s.id}"><span>${esc(s.fecha)}<br><small>${esc(s.nombre)}</small></span><small>${s.temas} temas</small></div>`).join('')
-    || '<p class="nota">Rekordbox todavía no tiene historial.</p>';
-  if (!EV.sel && EV.sesiones.length) abrirSesion(EV.sesiones[0].id);
-}
-async function abrirSesion(id) {
-  EV.sel = id;
-  document.querySelectorAll('.ev-ses').forEach((el) => el.classList.toggle('act', el.dataset.ses === id));
-  const s = EV.sesiones.find((x) => x.id === id);
-  const { ids } = await api('/api/sesion?id=' + encodeURIComponent(id));
-  pintarEvFilas(`${s.fecha} · ${s.nombre}`, ids.map((i) => E.porId[i]).filter(Boolean), false);
-}
-function pintarEvFilas(titulo, temas, conVeces) {
-  $('#evDet').innerHTML = `<h2 style="margin:0 0 8px;font-size:15px">${esc(titulo)}</h2>` + temas.map((t, i) => `<div class="ev-fila">
-      <span class="n">${conVeces ? t.tocado + '×' : i + 1}</span>
-      <button type="button" class="mini" data-evplay="${t.id}" title="Escuchar">▶</button>
-      <span>${esc(val(t, 'titulo'))}</span><span style="color:var(--txt2)">${esc(val(t, 'artista'))}</span>
-      <span>${t.bpm ? Math.round(t.bpm) : ''}</span><span>${esc(t.tono)}</span><span style="color:var(--acento2)">${esc(momentoDe(t) || '')}</span></div>`).join('')
-    || '<p class="nota">Sin temas.</p>';
-}
-$('#evTabs').addEventListener('click', (e) => { const b = e.target.closest('[data-evt]'); if (b) { EV.tab = b.dataset.evt; pintarEventos(); } });
-$('#evLista').addEventListener('click', (e) => { const f = e.target.closest('[data-ses]'); if (f) abrirSesion(f.dataset.ses); });
-$('#evDet').addEventListener('click', (e) => {
-  const p = e.target.closest('[data-evplay]'); if (!p) return;
-  const t = E.porId[p.dataset.evplay];
-  if (t) { if (!audio.paused && audio.dataset.id === t.id) audio.pause(); else { tocar(t); audio.dataset.id = t.id; } }
-});
-$('#evNunca').onclick = () => { E.filtros = { tocado: 'Nunca' }; E.buscar = ''; $('#buscar').value = ''; irA('coleccion'); pintarFiltros(); aplicarFiltros(); };
 
 // ---------------------------------------------------------------- LIMPIEZA DE BACKUPS
 const tamTxt = (b) => (b >= 1e9 ? (b / 1e9).toFixed(1) + ' GB' : b >= 1e6 ? Math.round(b / 1e6) + ' MB' : Math.round(b / 1e3) + ' KB');

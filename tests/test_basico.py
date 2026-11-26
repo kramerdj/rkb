@@ -12,6 +12,7 @@ import time
 import unittest
 import urllib.request
 import zipfile
+from collections import defaultdict
 from pathlib import Path
 
 RAIZ = Path(__file__).resolve().parent.parent
@@ -41,6 +42,84 @@ class Categorias(unittest.TestCase):
     def test_decada_y_bpm(self):
         self.assertEqual(categorias.tag_decada(1985), ["80s"])
         self.assertEqual(categorias.tag_bpm(128), ["120 a 128"])
+
+
+class MyTagsCategorias(unittest.TestCase):
+    """My Tags con bases como las de Windows: categorías con otros ID y tags de fábrica de Rekordbox."""
+
+    def base(self, ids_cat):
+        import datetime
+        from uuid import uuid4
+
+        from pyrekordbox.masterdb import models as m
+        from sqlalchemy import create_engine
+        from sqlalchemy.orm import Session
+        carpeta = Path(tempfile.mkdtemp(dir=TMP))
+        motor = create_engine(f"sqlite:///{carpeta / 'master.db'}")
+        # base mínima con las tablas de Rekordbox (sin columnas obligatorias, como una base vacía)
+        cols = [c for t in m.Base.metadata.tables.values() for c in t.columns if not c.primary_key and not c.nullable]
+        for c in cols:
+            c.nullable = True
+        try:
+            m.Base.metadata.create_all(motor)
+        finally:
+            for c in cols:
+                c.nullable = False
+        ahora = datetime.datetime.now()
+
+        def fila(modelo, **kw):
+            return modelo(UUID=str(uuid4()), created_at=ahora, updated_at=ahora, **kw)
+
+        filas = [fila(m.DjmdMyTag, ID=cid, Seq=seq, Name=nombre, Attribute=1, ParentID="root")
+                 for seq, (cid, nombre) in enumerate(zip(ids_cat, ["Genre", "Components", "Situation", ""]), 1)]
+        filas += [fila(m.DjmdMyTag, ID=f"95{seq}", Seq=seq, Name=nombre, Attribute=0, ParentID=ids_cat[0])
+                  for seq, nombre in enumerate(["House", "Techno"], 1)]          # tags de fábrica, sin temas
+        filas.append(fila(m.DjmdContent, ID="1", Title="Tema", ReleaseYear=1985,
+                          Commnt="País: Argentina | Idioma: Español", FolderPath=""))
+        filas.append(m.AgentRegistry(registry_id="localUpdateCount", int_1=0, date_1=ahora, date_2=ahora,
+                                     created_at=ahora, updated_at=ahora))
+        with Session(motor) as s:
+            s.add_all(filas)
+            s.commit()
+        motor.dispose()
+        config.guardar({"rekordbox": str(carpeta)})
+
+    def setUp(self):
+        os.environ["KRAMER_RB_TEST"] = "1"
+        self.cfg_previa = config.cargar().get("rekordbox")
+
+    def tearDown(self):
+        os.environ.pop("KRAMER_RB_TEST", None)
+        config.guardar({"rekordbox": self.cfg_previa or ""})
+
+    def test_no_muestra_tags_de_fabrica(self):
+        from kramer import rb
+        self.base(["1", "2", "3", "4"])
+        cats = rb.listar_mytags()
+        self.assertEqual(cats[0]["nombre"], "Origen/Idioma")
+        self.assertEqual(cats[0]["tags"], [])                 # no House/Techno debajo de «Origen/Idioma»
+
+    def test_categorias_con_otros_id(self):
+        from pyrekordbox.masterdb import models as m
+
+        from kramer import rb
+        self.base(["900", "901", "902", "903"])
+        rb.sincronizar_categorias(simular=False, leer_archivos=False)
+        db = rb.abrir()
+        try:
+            hijos = defaultdict(set)
+            for t in db.query(m.DjmdMyTag).filter(m.DjmdMyTag.Attribute == 0):
+                hijos[t.ParentID].add(t.Name)
+            nombres_cat = {t.ID: t.Name for t in db.query(m.DjmdMyTag).filter(m.DjmdMyTag.ParentID == "root")}
+        finally:
+            db.close()
+        self.assertEqual(nombres_cat["900"], "Origen/Idioma")
+        self.assertEqual(hijos["900"], {"Argentina", "Latinoamérica", "Español"})
+        self.assertEqual(hijos["902"], {"80s"})
+        self.assertTrue(set(hijos) <= {"900", "901", "902", "903"})   # nada colgado de categorías que no existen
+        cats = {c["id"]: {t["nombre"] for t in c["tags"]} for c in rb.listar_mytags()}
+        self.assertEqual(cats["1"], {"Argentina", "Latinoamérica", "Español"})
+        self.assertEqual(set(rb.leer_coleccion()["temas"][0]["cats"]["1"]), {"Argentina", "Latinoamérica", "Español"})
 
 
 class Lista(unittest.TestCase):

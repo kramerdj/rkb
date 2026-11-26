@@ -12,7 +12,7 @@ from pyrekordbox.utils import get_rekordbox_pid
 
 from . import archivos, categorias, config, mytags, plataforma
 
-CAT_MOMENTO = "4"
+CAT_MOMENTO = "4"                       # lugar de la categoría Momento (la 4ª), no su ID en la base
 lock = threading.RLock()
 
 
@@ -82,10 +82,22 @@ def _datos(c, pais=None, idioma=None):
             "bpm": (c.BPM or 0) / 100}
 
 
+def ids_categorias(db):
+    """{lugar: ID en la base} de las 4 categorías de My Tags ("1".."4" = 1ª..4ª columna de Rekordbox).
+    En muchas bases las categorías tienen justo los ID 1 a 4, pero no en todas (pasa en Windows):
+    ahí se toman en el orden en que las muestra Rekordbox."""
+    lugares = [c["id"] for c in categorias.DEFAULT]
+    raiz = [str(t.ID) for t in db.query(m.DjmdMyTag).filter(m.DjmdMyTag.ParentID == "root").order_by(m.DjmdMyTag.Seq)]
+    if not raiz or all(x in raiz for x in lugares):
+        return {x: x for x in lugares}
+    return {x: (raiz[i] if i < len(raiz) else x) for i, x in enumerate(lugares)}
+
+
 def tags_automaticos(db, cid, datos, ahora):
     """Pone los tags de las categorías automáticas de un tema (según Ajustes de My Tags)."""
+    ids = ids_categorias(db)
     for cat in categorias.automaticas():
-        _poner_tags(db, str(cid), cat["id"], categorias.calcular(cat["fuente"], datos), ahora)
+        _poner_tags(db, str(cid), ids[cat["id"]], categorias.calcular(cat["fuente"], datos), ahora)
 
 
 # =============================================================================
@@ -123,9 +135,12 @@ def leer_coleccion():
     with lock:
         db = abrir()
         try:
+            ids = ids_categorias(db)
+            lugar_de = {v: k for k, v in ids.items()}
             cats = {}
             for t in db.query(m.DjmdMyTag).filter(m.DjmdMyTag.Attribute == 0):
-                cats[t.ID] = (t.ParentID, t.Name)
+                if t.ParentID in lugar_de:
+                    cats[t.ID] = (lugar_de[t.ParentID], t.Name)
             tags_tema = defaultdict(lambda: defaultdict(list))
             for a in db.query(m.DjmdSongMyTag):
                 if a.MyTagID in cats:
@@ -187,10 +202,10 @@ def leer_coleccion():
                     "existe": bool(c.FolderPath) and Path(c.FolderPath).is_file(),
                 })
             momentos = [t.Name for t in db.query(m.DjmdMyTag)
-                        .filter(m.DjmdMyTag.ParentID == CAT_MOMENTO).order_by(m.DjmdMyTag.Seq)]
+                        .filter(m.DjmdMyTag.ParentID == ids[CAT_MOMENTO]).order_by(m.DjmdMyTag.Seq)]
             cats_cfg = categorias.cargar()
             for k in cats_cfg:
-                k["tags"] = [t.Name for t in db.query(m.DjmdMyTag).filter(m.DjmdMyTag.ParentID == k["id"])
+                k["tags"] = [t.Name for t in db.query(m.DjmdMyTag).filter(m.DjmdMyTag.ParentID == ids[k["id"]])
                              .order_by(m.DjmdMyTag.Seq)]
             return {"temas": temas, "playlists": playlists, "momentos": momentos or config.MOMENTOS,
                     "categorias": cats_cfg}
@@ -293,17 +308,18 @@ def aplicar(pend, respaldar_archivo, log):
                 tags_automaticos(db, cid, _datos(c, pais, idioma), ahora)
                 resumen["metadata"] += 1
                 log(f"Metadata: {c.ArtistName} - {c.Title}")
+            ids = ids_categorias(db)
             for cid, mom in pend.get("momento", {}).items():
                 if db.get_content(ID=cid) is None:
                     continue
-                _poner_tags(db, cid, CAT_MOMENTO, [mom] if mom else [], ahora)
+                _poner_tags(db, cid, ids[CAT_MOMENTO], [mom] if mom else [], ahora)
             manuales = {k["id"] for k in categorias.cargar() if k["fuente"] == "manual"}
             for cid, por_cat in pend.get("tags", {}).items():
                 if db.get_content(ID=cid) is None:
                     continue
                 for cat, nombres in por_cat.items():
                     if cat in manuales:
-                        _poner_tags(db, cid, cat, nombres, ahora)
+                        _poner_tags(db, cid, ids[cat], nombres, ahora)
                 resumen["momento"] += 1
             db.commit()
         except Exception:
@@ -425,7 +441,7 @@ def buscar_duplicados():
             for s in db.get_playlist_songs():
                 if str(s.PlaylistID) in playlists:
                     en_pl[str(s.ContentID)].append(playlists[str(s.PlaylistID)])
-            mom_ids = {t.ID: t.Name for t in db.query(m.DjmdMyTag).filter(m.DjmdMyTag.ParentID == CAT_MOMENTO)}
+            mom_ids = {t.ID: t.Name for t in db.query(m.DjmdMyTag).filter(m.DjmdMyTag.ParentID == ids_categorias(db)[CAT_MOMENTO])}
             momento = {}
             for a in db.query(m.DjmdSongMyTag):
                 if a.MyTagID in mom_ids:
@@ -523,7 +539,7 @@ def borrar_duplicados(grupos, mover_archivo, log):
         db = abrir()
         try:
             a_mover = []
-            mom_ids = {t.ID for t in db.query(m.DjmdMyTag).filter(m.DjmdMyTag.ParentID == CAT_MOMENTO)}
+            mom_ids = {t.ID for t in db.query(m.DjmdMyTag).filter(m.DjmdMyTag.ParentID == ids_categorias(db)[CAT_MOMENTO])}
             for g in grupos:
                 keep = db.get_content(ID=str(g["conservar"]))
                 if keep is None:
@@ -595,10 +611,15 @@ def listar_mytags():
             cuenta = defaultdict(int)
             for a in db.query(m.DjmdSongMyTag):
                 cuenta[a.MyTagID] += 1
+            ids = ids_categorias(db)
             out = []
             for cfg in categorias.cargar():
                 tags = [{"id": t.ID, "nombre": t.Name, "temas": cuenta.get(t.ID, 0)} for t in
-                        db.query(m.DjmdMyTag).filter(m.DjmdMyTag.ParentID == cfg["id"]).order_by(m.DjmdMyTag.Seq)]
+                        db.query(m.DjmdMyTag).filter(m.DjmdMyTag.ParentID == ids[cfg["id"]]).order_by(m.DjmdMyTag.Seq)]
+                if cfg["fuente"] != "manual":
+                    # los tags que trae Rekordbox de fábrica (sin temas) no son de esta categoría:
+                    # se borran solos al actualizar la base
+                    tags = [t for t in tags if t["temas"]]
                 out.append({**cfg, "tags": tags, "manual": cfg["fuente"] == "manual"})
             return out
         finally:
@@ -622,6 +643,7 @@ def editar_mytags(cambios):
                 cat = str(c.get("cat") or CAT_MOMENTO)
                 if cat not in manuales:
                     continue
+                cat = ids_categorias(db)[cat]
                 acc = c.get("accion")
                 if acc == "agregar":
                     nombre = (c.get("nombre") or "").strip()
@@ -649,34 +671,6 @@ def editar_mytags(cambios):
         except Exception:
             db.rollback()
             raise
-        finally:
-            db.close()
-
-
-# =============================================================================
-# EVENTOS TOCADOS (historial de Rekordbox)
-# =============================================================================
-def sesiones():
-    with lock:
-        db = abrir()
-        try:
-            cuenta = defaultdict(int)
-            for sh in db.query(m.DjmdSongHistory):
-                cuenta[sh.HistoryID] += 1
-            out = [{"id": h.ID, "nombre": h.Name, "fecha": (h.DateCreated or "")[:10], "temas": cuenta.get(h.ID, 0)}
-                   for h in db.query(m.DjmdHistory) if h.Attribute == 0 and cuenta.get(h.ID)]
-            return sorted(out, key=lambda x: x["fecha"], reverse=True)
-        finally:
-            db.close()
-
-
-def sesion(hid):
-    with lock:
-        db = abrir()
-        try:
-            filas = sorted(db.query(m.DjmdSongHistory).filter(m.DjmdSongHistory.HistoryID == str(hid)),
-                           key=lambda s: s.TrackNo or 0)
-            return [str(s.ContentID) for s in filas]
         finally:
             db.close()
 
@@ -795,8 +789,9 @@ def sincronizar_categorias(simular=True, leer_archivos=True):
                 if a.MyTagID in nombre_tag:
                     cat, n = nombre_tag[a.MyTagID]
                     actuales[cat][str(a.ContentID)].add(n)
+            ids = ids_categorias(db)
             for cfg in cats:
-                cat = cfg["id"]
+                cat = ids[cfg["id"]]
                 fila = db.query(m.DjmdMyTag).filter(m.DjmdMyTag.ID == cat).one_or_none()
                 if fila is not None and fila.Name != cfg["nombre"] and not simular:
                     fila.Name, fila.updated_at = cfg["nombre"], ahora

@@ -5,11 +5,11 @@
 <h1 align="center">RKB Collection Manager</h1>
 
 <p align="center">
-  Organizá tu colección de Rekordbox: listas de temas, metadata, calidad, duplicados, My Tags, eventos y backups.
+  Organizá tu colección de Rekordbox: listas de temas, metadata, calidad, duplicados, My Tags y backups.
 </p>
 
 <p align="center">
-  <b>Versión 0.8 · beta</b> · Mac y Windows · Rekordbox 6 y 7 · GPL-3.0
+  <b>Versión 0.9 · beta</b> · Mac y Windows · Rekordbox 6 y 7 · GPL-3.0
 </p>
 
 ---
@@ -34,7 +34,6 @@ La app está ordenada en cinco pasos:
 
 Además:
 
-- **Eventos tocados:** qué pasaste en cada fecha, según el historial de Rekordbox, y qué temas nunca tocaste.
 - **Backup y restauración:** copia completa de la base de Rekordbox y de tu música, pensada para un disco externo.
 - **Historial:** cada operación guarda su backup y se puede deshacer.
 - **Cartelera:** anuncios de eventos, cursos, equipos y búsquedas de DJs de tu zona (opcional, necesita el servidor).

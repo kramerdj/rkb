@@ -43,14 +43,15 @@ tests/                   pruebas sin Rekordbox: python -m unittest discover -s t
 ## Reglas que no se rompen
 
 1. **La base de Rekordbox es sagrada.** Toda escritura va dentro de `historial.Operacion` (backup previo + registro para deshacer) y sólo con Rekordbox cerrado (`requiere_cerrado()` / `rb.rekordbox_abierto()`).
-2. **Rutas:** comparar siempre normalizadas (NFC + casefold, `rb._clave_path`). macOS mezcla NFC/NFD y no distingue mayúsculas. En Windows Rekordbox guarda rutas con `/`.
-3. **Nunca borrar archivos del usuario.** Se mueven a carpetas de backup; el backup de la colección aparta en `_quitados`, no borra.
-4. **macOS:** sin «Acceso total al disco» falla con PermissionError → el servidor lo traduce a un mensaje con la solución. Las escrituras de historial son *create-only* (archivo nuevo por operación) por eso.
-5. **Nada de integraciones con descargadores** (Soulseek, deezload, yt-dlp, etc.). Decisión tomada: la app no descarga música.
-6. **Telemetría:** no se envía nada de la colección. Sólo existe el aviso de riesgo (`acepto_riesgo`). No agregar envío de datos sin que Guido lo pida.
-7. **Seguridad de la nube:** la app sólo lleva la *anon key*. Todos los permisos están en `supabase.sql` (RLS + triggers): un usuario común no puede publicar, destacar, marcar pagado ni hacerse admin. Cualquier cambio de permisos va en `supabase.sql` y se prueba contra Postgres.
-8. **Licencia GPL-3.0-or-later** (por mutagen). La app lleva su código fuente adentro (`codigo-fuente.zip`). Mantener créditos en Acerca de.
-9. Errores para el usuario: en castellano, qué pasó y qué hacer. Nunca un traceback crudo en pantalla.
+2. **My Tags:** en la config las categorías son lugares "1".."4" (1ª..4ª columna de Rekordbox), no ID de la base. Pasar siempre por `rb.ids_categorias(db)`: en algunas bases (Windows) las categorías no tienen los ID 1 a 4. Las categorías automáticas no muestran tags sin temas (los de fábrica de Rekordbox).
+3. **Rutas:** comparar siempre normalizadas (NFC + casefold, `rb._clave_path`). macOS mezcla NFC/NFD y no distingue mayúsculas. En Windows Rekordbox guarda rutas con `/`.
+4. **Nunca borrar archivos del usuario.** Se mueven a carpetas de backup; el backup de la colección aparta en `_quitados`, no borra.
+5. **macOS:** sin «Acceso total al disco» falla con PermissionError → el servidor lo traduce a un mensaje con la solución. Las escrituras de historial son *create-only* (archivo nuevo por operación) por eso.
+6. **Nada de integraciones con descargadores** (Soulseek, deezload, yt-dlp, etc.). Decisión tomada: la app no descarga música.
+7. **Telemetría:** no se envía nada de la colección. Sólo existe el aviso de riesgo (`acepto_riesgo`). No agregar envío de datos sin que Guido lo pida.
+8. **Seguridad de la nube:** la app sólo lleva la *anon key*. Todos los permisos están en `supabase.sql` (RLS + triggers): un usuario común no puede publicar, destacar, marcar pagado ni hacerse admin. Cualquier cambio de permisos va en `supabase.sql` y se prueba contra Postgres.
+9. **Licencia GPL-3.0-or-later** (por mutagen). La app lleva su código fuente adentro (`codigo-fuente.zip`). Mantener créditos en Acerca de.
+10. Errores para el usuario: en castellano, qué pasó y qué hacer. Nunca un traceback crudo en pantalla.
 
 ## Cómo probar
 
@@ -70,7 +71,7 @@ tests/                   pruebas sin Rekordbox: python -m unittest discover -s t
 
 ## Estado y pendientes (26 de noviembre de 2026)
 
-- Versión 0.8 en prueba piloto con DJs conocidos, repartida a mano (Google Drive). Guido usa una Mac con chip Apple (Rekordbox 7) y una PC con Windows 11.
+- Versión 0.9 en prueba piloto con DJs conocidos, repartida a mano (Google Drive). En la 0.9 se quitó la pestaña «Eventos tocados» (el filtro «Tocado» de Colección sigue). Guido usa una Mac con chip Apple (Rekordbox 7) y una PC con Windows 11.
 - Windows: la primera compilación en la PC de Guido armó el .exe bien; falló sólo el zip final porque Defender tenía el .exe tomado. Corregido en `armar_app_windows.ps1` (cierra el .exe de prueba, reintenta y arma el zip desde la copia de trabajo).
 - Pipeline: confirmar que «Publicar versión» arma bien Mac y Windows (correrlo sin tildar «Publicar») antes de la primera Release.
 - Las Releases de un repositorio privado no se pueden bajar sin cuenta: para repartir desde GitHub hace falta repo público (o seguir con Drive).
