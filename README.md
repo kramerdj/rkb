@@ -83,6 +83,16 @@ Variables de entorno útiles para desarrollo:
 
 Cada sistema se arma en su propia computadora. El script de Mac además instala la app en `/Applications`, reemplazando la versión anterior, y la abre.
 
+## Publicar una versión
+
+No hace falta armar nada a mano: GitHub arma la app para Mac y para Windows y la publica.
+
+1. Subí el número en [`web/version.txt`](web/version.txt) (por ejemplo, de `0.8` a `0.9`) y guardá el cambio en `main`.
+2. En GitHub, andá a **Actions → Publicar versión → Run workflow**, tildá «Publicar como versión nueva» y tocá **Run workflow**.
+3. En unos minutos la versión aparece en **Releases** con los dos zips. Los botones de descarga del sitio apuntan siempre a la última.
+
+Si corrés el flujo sin tildar la opción, arma la app y deja los zips en esa corrida, sin publicar nada: sirve para probar.
+
 ## Cómo está hecha
 
 ```

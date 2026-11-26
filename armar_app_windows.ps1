@@ -3,7 +3,9 @@
 $ErrorActionPreference = "Stop"
 $SRC = Split-Path -Parent $MyInvocation.MyCommand.Path
 Set-Location $SRC
-$DESC = Join-Path $env:USERPROFILE "Downloads"
+$DESC = if ($env:KRAMER_SALIDA) { $env:KRAMER_SALIDA } else { Join-Path $env:USERPROFILE "Downloads" }
+New-Item -ItemType Directory -Force -Path $DESC | Out-Null
+$FALLO = $false
 $LOG = Join-Path $DESC "kramer_build_windows.txt"
 Start-Transcript -Path $LOG -Force | Out-Null
 Write-Host "=== Armando RKB Collection Manager.exe ($(Get-Date)) ==="
@@ -81,13 +83,15 @@ with zipfile.ZipFile(z, 'w', zipfile.ZIP_DEFLATED) as zf:
   Write-Host "Listo:"
   Write-Host " · App: $FINAL ($MB MB)"
   Write-Host " · Para compartir: $ZIPW"
-  Start-Process explorer.exe "/select,`"$FINAL`""
+  if (-not $env:KRAMER_SALIDA) { Start-Process explorer.exe "/select,`"$FINAL`"" }
 }
 catch {
   Write-Host ""
   Write-Host "ERROR: $_" -ForegroundColor Red
   Write-Host "El detalle quedó en $LOG"
+  $FALLO = $true
 }
 finally {
   Stop-Transcript | Out-Null
 }
+if ($FALLO) { exit 1 }
