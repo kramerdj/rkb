@@ -41,8 +41,8 @@ const cerrarModal = () => { $('#modal').hidden = true; $('#modal .caja').classLi
 
 // ---------------------------------------------------------------- MENÚ
 const VISTAS = [
-  ['lista', '1 · Lista de temas'], ['descargas', '2 · Descargas'], ['incorporar', '3 · Incorporar'],
-  ['mytags', '4 · My Tags'], ['coleccion', '5 · Colección'], ['-'], ['cartelera', 'Cartelera'], ['misanuncios', 'Mis anuncios'], ['respaldos', 'Backup y restauración'], ['ajustes', 'Ajustes e historial'],
+  ['lista', 'Lista de temas'], ['descargas', 'Descargas'], ['incorporar', 'Incorporar'],
+  ['mytags', 'My Tags'], ['coleccion', 'Colección'], ['-'], ['cartelera', 'Cartelera'], ['misanuncios', 'Mis anuncios'], ['respaldos', 'Backup y restauración'], ['ajustes', 'Ajustes e historial'],
 ];
 function pintarMenu() {
   const n = nPend();
@@ -121,7 +121,7 @@ const val = (t, k) => (E.pend.meta[t.id] && E.pend.meta[t.id][k] !== undefined ?
 const momentoDe = (t) => (t.id in E.pend.momento ? E.pend.momento[t.id] : t.momento);
 
 async function cargarColeccion() {
-  $('#filas').innerHTML = '<div class="fila"><span></span><span>Cargando la colección…</span></div>';
+  $('#filas').innerHTML = '<div class="fila fila-msg"><span></span><span>Cargando la colección…</span></div>';
   try {
     const d = await api('/api/coleccion');
     E.temas = d.temas; E.playlists = d.playlists; E.momentos = d.momentos; E.pend = d.pendientes;
@@ -130,7 +130,7 @@ async function cargarColeccion() {
     E.multi.clear(); pintarListas(); pintarFiltros(); aplicarFiltros(); pintarMomentos(); pintarSync(); pintarMenu(); pintarPanel();
     if (!E.sel && E.lista.length) seleccionar(E.lista[0].id, false);
   } catch (e) {
-    $('#filas').innerHTML = `<div class="fila fila-error"><span></span><span>${esc(e.message)}</span></div>`;
+    $('#filas').innerHTML = `<div class="fila fila-msg fila-error"><span></span><span>${esc(e.message)}</span></div>`;
   }
 }
 
@@ -244,7 +244,7 @@ const VT = { alto: 35, desde: -1, hasta: -1 };
 function pintarTabla() {
   pintarEncabezado();
   const cont = $('#filas');
-  if (!E.lista.length) { cont.innerHTML = '<div class="fila"><span></span><span>Ningún tema con estos filtros.</span></div>'; VT.desde = -1; return; }
+  if (!E.lista.length) { cont.innerHTML = '<div class="fila fila-msg"><span></span><span>Ningún tema con estos filtros.</span></div>'; VT.desde = -1; return; }
   if (!$('#vEsp')) cont.innerHTML = '<div id="vEsp"><div id="vVis"></div></div>';
   $('#vEsp').style.height = (E.lista.length * VT.alto) + 'px';
   VT.desde = -1; pintarVentana();
@@ -426,7 +426,7 @@ function pintarPanel() {
     $('#loteForm').innerHTML = LOTE.map(([k, l]) => {
       const vals = new Set(ts.map((t) => val(t, k) || ''));
       const ph = k === 'grouping' ? 'No cambiar' : vals.size === 1 ? ([...vals][0] || '(vacío)') + ' · igual en todos' : 'Varios — no cambiar';
-      return `<label>${l}<input name="${k}" ${LISTAS.includes(k) ? `list="dl-${k}"` : ''} placeholder="${esc(ph)}" spellcheck="false"></label>`;
+      return `<label>${l}<input name="${k}" ${LISTAS.includes(k) ? `data-dl="dl-${k}"` : ''} placeholder="${esc(ph)}" spellcheck="false"></label>`;
     }).join('');
   } else {
     $('.meta-cab h2').textContent = 'Metadata';
@@ -527,7 +527,7 @@ function pintarMeta(id, base) {
   $('#metaEstado').textContent = n ? `${n} cambio${n > 1 ? 's' : ''} sin guardar` : '';
   const foco = document.activeElement && document.activeElement.name;
   $('#metaForm').innerHTML = CAMPOS.map(([k, l]) =>
-    `<label>${l}<input name="${k}" ${LISTAS.includes(k) ? `list="dl-${k}"` : ''} value="${esc(p[k] !== undefined ? p[k] : base[k] || '')}" class="${p[k] !== undefined ? 'cambio' : ''}" spellcheck="false"></label>`).join('');
+    `<label>${l}<input name="${k}" ${LISTAS.includes(k) ? `data-dl="dl-${k}"` : ''} value="${esc(p[k] !== undefined ? p[k] : base[k] || '')}" class="${p[k] !== undefined ? 'cambio' : ''}" spellcheck="false"></label>`).join('');
   if (foco) $('#metaForm').querySelector(`[name="${foco}"]`)?.focus();
 }
 $('#metaForm').addEventListener('change', async (e) => {
@@ -701,6 +701,85 @@ async function confirmarDup(n, pls) {
   };
   acc.append(vol, ok);
 }
+
+// ---------------------------------------------------------------- SUGERENCIAS
+// Género, Grouping, País e Idioma sugieren valores de la colección con una lista propia:
+// el desplegable del sistema (<datalist>) en modo oscuro casi no se lee, sobre todo en Mac.
+const SUG = { inp: null, items: [], i: -1, el: null };
+const sinTildes = (s) => String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+function sugCaja() {
+  if (SUG.el) return SUG.el;
+  SUG.el = document.createElement('div');
+  SUG.el.className = 'sug'; SUG.el.id = 'sug'; SUG.el.setAttribute('role', 'listbox'); SUG.el.hidden = true;
+  SUG.el.addEventListener('mousedown', (e) => { e.preventDefault(); const o = e.target.closest('[data-i]'); if (o) elegirSug(+o.dataset.i, true); });
+  document.body.append(SUG.el);
+  return SUG.el;
+}
+// todos: al entrar al campo o hacerle clic se ve la lista entera; al escribir, se filtra
+function abrirSug(inp, todos) {
+  const dl = document.getElementById(inp.dataset.dl); if (!dl) return;
+  const q = todos ? '' : sinTildes(inp.value), empiezan = [], contienen = [];
+  for (const o of dl.options) {
+    const n = sinTildes(o.value);
+    if (!q || n.startsWith(q)) empiezan.push(o.value); else if (n.includes(q)) contienen.push(o.value);
+  }
+  SUG.items = [...empiezan, ...contienen].slice(0, 80);
+  if (!SUG.items.length || (SUG.items.length === 1 && sinTildes(SUG.items[0]) === q)) { cerrarSug(); return; }
+  SUG.inp = inp; SUG.i = -1;
+  const actual = SUG.items.findIndex((v) => sinTildes(v) === sinTildes(inp.value));
+  const caja = sugCaja();
+  const marcar = (v) => {
+    const k = q ? sinTildes(v).indexOf(q) : -1;
+    return k < 0 ? esc(v) : esc(v.slice(0, k)) + '<b>' + esc(v.slice(k, k + q.length)) + '</b>' + esc(v.slice(k + q.length));
+  };
+  caja.innerHTML = SUG.items.map((v, i) => `<div class="sug-op" role="option" id="sug-${i}" data-i="${i}">${marcar(v)}</div>`).join('');
+  caja.hidden = false;
+  const r = inp.getBoundingClientRect(), alto = Math.min(260, caja.scrollHeight + 2);
+  caja.style.left = r.left + 'px';
+  caja.style.width = Math.max(r.width, 180) + 'px';
+  caja.style.top = (r.bottom + 4 + alto > innerHeight && r.top - 4 - alto > 0 ? r.top - 4 - alto : r.bottom + 4) + 'px';
+  inp.setAttribute('aria-expanded', 'true');
+  if (actual >= 0) { SUG.i = actual; caja.querySelector(`[data-i="${actual}"]`).classList.add('act'); caja.querySelector(`[data-i="${actual}"]`).scrollIntoView({ block: 'nearest' }); }
+}
+function cerrarSug() {
+  if (SUG.el) SUG.el.hidden = true;
+  if (SUG.inp) { SUG.inp.setAttribute('aria-expanded', 'false'); SUG.inp.removeAttribute('aria-activedescendant'); }
+  SUG.inp = null; SUG.i = -1;
+}
+function marcarSug(i) {
+  SUG.i = i;
+  SUG.el.querySelectorAll('.sug-op').forEach((o) => o.classList.toggle('act', +o.dataset.i === i));
+  const o = SUG.el.querySelector(`[data-i="${i}"]`);
+  if (o) { o.scrollIntoView({ block: 'nearest' }); SUG.inp.setAttribute('aria-activedescendant', o.id); }
+}
+function elegirSug(i, conMouse) {
+  const inp = SUG.inp; if (!inp || !(i in SUG.items)) return;
+  inp.value = SUG.items[i];
+  cerrarSug();
+  // con el mouse se guarda en el momento; con Enter lo guarda el propio formulario al soltar el campo
+  if (conMouse) inp.dispatchEvent(new Event('change', { bubbles: true }));
+}
+const esSug = (el) => el && el.tagName === 'INPUT' && el.dataset && el.dataset.dl;
+document.addEventListener('focusin', (e) => {
+  if (!esSug(e.target)) return;
+  const inp = e.target;
+  inp.setAttribute('role', 'combobox'); inp.setAttribute('aria-autocomplete', 'list'); inp.setAttribute('aria-controls', 'sug');
+  abrirSug(inp, true);
+});
+document.addEventListener('focusout', (e) => { if (e.target === SUG.inp) cerrarSug(); });
+document.addEventListener('input', (e) => { if (esSug(e.target)) abrirSug(e.target); });
+document.addEventListener('mousedown', (e) => { if (esSug(e.target) && document.activeElement === e.target && !SUG.inp) abrirSug(e.target, true); });
+document.addEventListener('keydown', (e) => {
+  if (!esSug(e.target)) return;
+  if (!SUG.inp) { if (e.key === 'ArrowDown') { e.preventDefault(); abrirSug(e.target, true); } return; }
+  if (e.key === 'ArrowDown') { e.preventDefault(); marcarSug(Math.min(SUG.i + 1, SUG.items.length - 1)); }
+  else if (e.key === 'ArrowUp') { e.preventDefault(); marcarSug(Math.max(SUG.i - 1, 0)); }
+  else if (e.key === 'Enter' && SUG.i >= 0) elegirSug(SUG.i, false);
+  else if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); cerrarSug(); }
+  else if (e.key === 'Tab') cerrarSug();
+}, true);
+addEventListener('resize', cerrarSug);
+document.addEventListener('scroll', (e) => { if (SUG.inp && !(SUG.el && SUG.el.contains(e.target))) cerrarSug(); }, true);
 
 // ---------------------------------------------------------------- TECLADO
 document.addEventListener('keydown', (e) => {

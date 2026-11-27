@@ -107,7 +107,7 @@ $('#lsGenerar').onclick = async () => {
       { txt: 'Cerrar' },
       { txt: 'Abrir el txt', fn: () => api('/api/abrir', { ruta: r.ruta }) },
       { txt: 'Mostrar en la carpeta', fn: () => api('/api/abrir', { ruta: r.ruta, mostrar: true }) },
-      { txt: 'Seguir con el paso 2', prim: true, fn: () => { cerrarModal(); DS.cargado = false; irA('descargas'); } },
+      { txt: 'Seguir con Descargas', prim: true, fn: () => { cerrarModal(); DS.cargado = false; irA('descargas'); } },
     ]);
   } catch (e) { aviso(e.message, true); }
 };
@@ -149,7 +149,7 @@ function pintarDescargas() {
       <span><span class="cal ${r.calidad || ''}">${esc(r.calidad === 'SIN ANALIZAR' ? '—' : (r.calidad || '—'))}</span><span class="sub2">${r.corte ? r.corte + ' kHz' : ''}${r.bitrate ? ' · ' + r.bitrate + ' kbps' : ''}</span></span>
       <button type="button" class="accion${r.accion === 'eliminar' ? ' eliminar' : ''}" data-dacc="${esc(a.ruta)}">${r.accion === 'eliminar' ? 'Eliminar' : 'Conservar'}</button>
       ${abierto ? `<div class="ds-edit">${[['artista', 'Artista'], ['titulo', 'Título'], ['genero', 'Género'], ['grouping', 'Grouping'], ['anio', 'Año'], ['album', 'Álbum'], ['pais', 'País'], ['idioma', 'Idioma']].map(([k, l]) =>
-        `<label>${l}<input data-dm="${k}" data-dr="${esc(a.ruta)}" value="${esc(m[k] || '')}" ${['genero', 'grouping', 'pais', 'idioma'].includes(k) ? `list="dl-${k}"` : ''}></label>`).join('')}</div>` : ''}
+        `<label>${l}<input data-dm="${k}" data-dr="${esc(a.ruta)}" value="${esc(m[k] || '')}" ${['genero', 'grouping', 'pais', 'idioma'].includes(k) ? `data-dl="dl-${k}"` : ''}></label>`).join('')}</div>` : ''}
     </div>`;
   }).join('');
   const hay = Object.keys(DS.res).length;
