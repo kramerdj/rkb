@@ -1,7 +1,7 @@
 {
-  "ultima": "0.9.1",
+  "ultima": "0.9.2",
   "minima": null,
   "minima_desde": null,
   "gracia_dias": 7,
-  "mensaje": ""
+  "mensaje": "En Colección ahora podés eliminar temas (van a la carpeta «eliminados») y buscar también por nombre de archivo."
 }
