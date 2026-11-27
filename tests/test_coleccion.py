@@ -43,6 +43,18 @@ class Coleccion(ConBase):
         self.assertTrue(base_rb.misma_ruta(t["ruta"], ruta))
         self.assertEqual(col["momentos"], ["Previa", "Warm Up", "Main", "Peak", "Close", "Lentos"])
 
+    def test_veces_tocado_guardado_como_texto(self):
+        _, cid = self.tema("soda.mp3", "De Música Ligera", "Soda Stereo")
+        for valor, esperado in (("41", 41), (7, 7), ("", 0), ("x", 0)):
+            with rb.lock:
+                db = rb.abrir()
+                try:
+                    db.get_content(ID=cid).DJPlayCount = valor
+                    db.commit()
+                finally:
+                    db.close()
+            self.assertEqual(rb.leer_coleccion()["temas"][0]["tocado"], esperado)
+
     def test_coleccion_vacia(self):
         self.assertEqual(rb.leer_coleccion()["temas"], [])
         self.assertEqual(rb.buscar_duplicados(), [])

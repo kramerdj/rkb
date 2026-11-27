@@ -130,6 +130,14 @@ _CAMELOT = {"C": "8B", "G": "9B", "D": "10B", "A": "11B", "E": "12B", "B": "1B",
             "Cm": "5A", "Gm": "6A", "Dm": "7A"}
 
 
+def _entero(v):
+    """Veces tocado: pyrekordbox declara la columna como texto, así que puede llegar "41", 41 o nada."""
+    try:
+        return int(v or 0)
+    except (TypeError, ValueError):
+        return 0
+
+
 def camelot(nombre):
     n = (nombre or "").strip()
     if not n:
@@ -206,7 +214,7 @@ def leer_coleccion():
                     "cues": n_cues.get(cid, 0),
                     "analizado": bool(c.Analysed),
                     "tono": claves.get(c.KeyID, ""),
-                    "tocado": max(tocado.get(cid, 0), c.DJPlayCount or 0),
+                    "tocado": max(tocado.get(cid, 0), _entero(c.DJPlayCount)),
                     "ultimaVez": ultima.get(cid, ""),
                     "existe": bool(c.FolderPath) and Path(c.FolderPath).is_file(),
                 })
