@@ -1,7 +1,7 @@
 {
-  "ultima": "0.9.2",
+  "ultima": "0.9.3",
   "minima": null,
   "minima_desde": null,
   "gracia_dias": 7,
-  "mensaje": "En Colección ahora podés eliminar temas (van a la carpeta «eliminados») y buscar también por nombre de archivo."
+  "mensaje": "La tabla de Colección se ve bien en notebooks, el menú es más simple y todo se lee mejor (más contraste y un desplegable de Género nuevo)."
 }
