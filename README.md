@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <b>Versión 0.9.1 · beta</b> · Mac y Windows · Rekordbox 6 y 7 · GPL-3.0
+  <b>Versión 0.9.2 · beta</b> · Mac y Windows · Rekordbox 6 y 7 · GPL-3.0
 </p>
 
 ---
@@ -30,7 +30,7 @@ La app está ordenada en cinco pasos:
 | **2 · Descargas** | Analiza los temas nuevos: completa metadata y carátulas, mide la calidad real del audio por espectro y marca los duplicados. |
 | **3 · Incorporar** | Mueve los temas a tu colección, los agrega a Rekordbox con su metadata y hace un chequeo de la playlist antes del evento. |
 | **4 · My Tags** | Arma las 4 categorías de My Tags de Rekordbox, automáticas desde la metadata o manuales. |
-| **5 · Colección** | Navegador con reproductor, edición de metadata de a uno o en lote, «Momento» (Warm Up, Main, Peak, Close) con teclas, sugerencias de temas que siguen bien, duplicados y nombres de archivo prolijos. |
+| **5 · Colección** | Navegador con reproductor, edición de metadata de a uno o en lote, «Momento» (Warm Up, Main, Peak, Close) con teclas, sugerencias de temas que siguen bien, duplicados, nombres de archivo prolijos y eliminar temas (avisa si están en playlists; los archivos van a la carpeta «eliminados»). |
 
 Además:
 

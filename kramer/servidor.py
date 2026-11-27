@@ -245,6 +245,39 @@ def api_duplicados_borrar(b):
                        "Los archivos quedaron en el backup (se recuperan con Deshacer).", "errores": r["errores"]}
 
 
+def api_eliminar_revisar(b):
+    return {"temas": rb.revisar_eliminar(b.get("ids", [])), "carpeta": str(config.dir_eliminados())}
+
+
+def api_eliminar(b):
+    requiere_cerrado()
+    ids = [str(i) for i in b.get("ids", [])]
+    if not ids:
+        return {"mensaje": "No elegiste ningún tema."}
+    n = len(ids)
+    with historial.Operacion(f"Eliminar {n} {'tema' if n == 1 else 'temas'}") as op:
+        r = rb.eliminar_temas(ids, op.eliminar_archivo, lambda s: None)
+        op.detalle = (f"{r['eliminados']} fuera de Rekordbox, {r['archivos']} archivos en «eliminados»"
+                      + (f", sacados de {r['dePlaylists']} playlists" if r["dePlaylists"] else ""))
+    # lo que quedaba pendiente de esos temas ya no tiene sentido
+    def sin_esos_temas(p):
+        for clave in ("momento", "meta", "tags"):
+            for cid in ids:
+                p[clave].pop(cid, None)
+    config.cambiar_pendientes(sin_esos_temas)
+    carpeta = config.dir_eliminados()
+    return {"mensaje": (f"Listo: eliminé {r['eliminados']} {'tema' if r['eliminados'] == 1 else 'temas'} de Rekordbox. "
+                        f"Los archivos quedaron en la carpeta «eliminados» ({carpeta}). Se puede deshacer desde Ajustes e historial."),
+            "errores": r["errores"]}
+
+
+def api_eliminados_abrir(_):
+    d = config.dir_eliminados()
+    d.mkdir(parents=True, exist_ok=True)
+    plataforma.abrir(d)
+    return {"ok": True}
+
+
 # ---------------------------------------------------------------- 1 · LISTA
 def api_lista_comparar(b):
     from . import lista
@@ -829,6 +862,7 @@ GET = {"/api/estado": api_estado, "/api/coleccion": api_coleccion, "/api/tema": 
 POST = {"/api/pendiente": api_pendiente, "/api/pendiente_lote": api_pendiente_lote, "/api/descartar": api_descartar,
         "/api/sincronizar": api_sincronizar, "/api/traer": api_traer_aplicar,
         "/api/config": api_config, "/api/duplicados": api_duplicados_borrar,
+        "/api/eliminar/revisar": api_eliminar_revisar, "/api/eliminar": api_eliminar, "/api/eliminados/abrir": api_eliminados_abrir,
         "/api/lista/comparar": api_lista_comparar, "/api/lista/link": api_lista_link,
         "/api/spotify/conectar": api_spotify_conectar, "/api/spotify/desconectar": api_spotify_desconectar,
         "/api/spotify/playlist": api_spotify_playlist, "/api/abrir_url": api_abrir_url,

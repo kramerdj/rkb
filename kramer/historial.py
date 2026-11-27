@@ -92,6 +92,7 @@ class Operacion:
         self.archivos = {}
         self.creados = []          # archivos que la operación puso en la colección (Deshacer los saca)
         self.renombrados = {}      # nuevo -> viejo (Deshacer los vuelve a su nombre)
+        self.eliminados = {}       # original -> lugar en la carpeta «eliminados» (Deshacer los devuelve)
 
     def __enter__(self):
         self.carpeta.parent.mkdir(parents=True, exist_ok=True)
@@ -131,6 +132,19 @@ class Operacion:
         shutil.move(ruta, destino)
         self.archivos[ruta] = str(destino)
 
+    def eliminar_archivo(self, ruta):
+        """Saca el archivo de la colección y lo deja en la carpeta «eliminados» (no se borra)."""
+        ruta = Path(ruta)
+        carpeta = config.dir_eliminados()
+        carpeta.mkdir(parents=True, exist_ok=True)
+        destino, n = carpeta / ruta.name, 2
+        while destino.exists():
+            destino = carpeta / f"{ruta.stem} ({n}){ruta.suffix}"
+            n += 1
+        shutil.move(str(ruta), destino)
+        self.eliminados[str(ruta)] = str(destino)
+        return destino
+
     def __exit__(self, tipo, valor, tb):
         # Se registra aunque haya fallado a mitad de camino: así siempre se puede deshacer.
         if tipo is not None and not self.archivos and not self.con_base:
@@ -140,6 +154,8 @@ class Operacion:
             _escribir_nuevo(self.carpeta / "creados.json", self.creados)
         if self.renombrados:
             _escribir_nuevo(self.carpeta / "renombrados.json", self.renombrados)
+        if self.eliminados:
+            _escribir_nuevo(self.carpeta / "eliminados.json", self.eliminados)
         que = self.que + (" (con error: revisala)" if tipo is not None else "")
         detalle = self.detalle if tipo is None else f"{self.detalle} · error: {valor}".strip(" ·")
         with _lock:
@@ -166,6 +182,7 @@ def deshacer(op_id):
             mapa = json.loads((carpeta / "archivos.json").read_text(encoding="utf-8"))
             renombrados = _opcional(carpeta / "renombrados.json", {})
             creados = _opcional(carpeta / "creados.json", [])
+            eliminados = _opcional(carpeta / "eliminados.json", {})
         except (OSError, ValueError):
             raise incompleto
         # Antes de pisar nada se guarda lo que hay ahora: lo que se hizo después de la operación no se pierde.
@@ -185,6 +202,10 @@ def deshacer(op_id):
         for nuevo, viejo in renombrados.items():
             if Path(nuevo).exists() and not Path(viejo).exists():
                 os.rename(nuevo, viejo)
+        for original, apartado in eliminados.items():
+            if Path(apartado).exists() and not Path(original).exists():
+                Path(original).parent.mkdir(parents=True, exist_ok=True)
+                shutil.move(apartado, original)
         apartados = 0
         for creado in creados:
             if Path(creado).exists() and creado not in mapa:

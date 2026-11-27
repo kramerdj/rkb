@@ -6,7 +6,7 @@ from unittest import mock
 import base_rb
 from pyrekordbox.masterdb import models as m
 
-from kramer import archivos, historial, ingreso, lista, rb
+from kramer import archivos, config, historial, ingreso, lista, rb
 
 
 def callado(_):
@@ -281,6 +281,70 @@ class Duplicados(ConBase):
         self.assertTrue(self.a_ruta.is_file())
         self.assertIsNotNone(base_rb.tema(self.a))
 
+
+class EliminarTemas(ConBase):
+    def setUp(self):
+        super().setUp()
+        self.a_ruta, self.a = self.tema("soda.mp3", "De Música Ligera", "Soda Stereo")
+        self.b_ruta, self.b = self.tema("queen.mp3", "Bohemian Rhapsody", "Queen")
+        self.evento = lista.crear_evento("Casamiento", [self.a, self.b])["id"]
+
+    def eliminar(self, *ids):
+        with historial.Operacion("Eliminar temas") as op:
+            self.op = op
+            return rb.eliminar_temas(list(ids), op.eliminar_archivo, callado)
+
+    def test_avisa_en_que_playlists_esta(self):
+        _, solo = self.tema("suelto.mp3", "Suelto", "Nadie")
+        r = {t["id"]: t["playlists"] for t in rb.revisar_eliminar([self.a, solo, "999999"])}
+        self.assertEqual(r, {self.a: ["Casamiento"], solo: []})
+
+    def test_saca_de_rekordbox_y_de_la_playlist_y_aparta_el_archivo(self):
+        original = self.a_ruta.read_bytes()
+        r = self.eliminar(self.a)
+        self.assertEqual((r["eliminados"], r["dePlaylists"], r["archivos"], r["errores"]), (1, 1, 1, []))
+        self.assertIsNone(base_rb.tema(self.a))
+        self.assertFalse(self.a_ruta.exists())
+        apartado = Path(next(iter(self.op.eliminados.values())))
+        self.assertEqual(apartado.parent, config.dir_eliminados())
+        self.assertEqual(apartado.name, "soda.mp3")
+        self.assertEqual(apartado.read_bytes(), original)
+        self.assertEqual({f["ContentID"] for f in self.consulta(m.DjmdSongPlaylist, PlaylistID=self.evento)}, {self.b})
+        self.assertEqual(self.consulta(m.DjmdSongMyTag, ContentID=self.a), [])
+        self.assertIsNotNone(base_rb.tema(self.b))
+
+    def test_varios_y_nombres_repetidos_en_eliminados(self):
+        config.dir_eliminados().mkdir(parents=True, exist_ok=True)
+        (config.dir_eliminados() / "soda.mp3").write_bytes(b"otro")
+        r = self.eliminar(self.a, self.b)
+        self.assertEqual(r["eliminados"], 2)
+        nombres = sorted(Path(x).name for x in self.op.eliminados.values())
+        self.assertEqual(nombres, ["queen.mp3", "soda (2).mp3"])
+        self.assertEqual((config.dir_eliminados() / "soda.mp3").read_bytes(), b"otro")
+
+    def test_no_mueve_un_archivo_que_usa_otro_tema(self):
+        _, otro = self.tema("copia.mp3", "Copia", "Soda Stereo")
+        with rb.lock:                              # dos temas de Rekordbox apuntando al mismo archivo
+            db = rb.abrir()
+            try:
+                db.get_content(ID=otro).FolderPath = db.get_content(ID=self.a).FolderPath
+                db.commit()
+            finally:
+                db.close()
+        r = self.eliminar(self.a)
+        self.assertEqual((r["eliminados"], r["archivos"]), (1, 0))
+        self.assertTrue(self.a_ruta.is_file())
+        self.assertIsNotNone(base_rb.tema(otro))
+
+    def test_deshacer_devuelve_todo(self):
+        original = self.a_ruta.read_bytes()
+        self.eliminar(self.a)
+        apartado = Path(next(iter(self.op.eliminados.values())))
+        historial.deshacer(self.op.carpeta.name)
+        self.assertEqual(self.a_ruta.read_bytes(), original)
+        self.assertFalse(apartado.exists())
+        self.assertIsNotNone(base_rb.tema(self.a))
+        self.assertEqual({f["ContentID"] for f in self.consulta(m.DjmdSongPlaylist, PlaylistID=self.evento)}, {self.a, self.b})
 
 class OrdenarNombres(ConBase):
     def setUp(self):
