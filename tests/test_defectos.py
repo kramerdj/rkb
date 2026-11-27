@@ -8,7 +8,10 @@ import os
 import threading
 import time
 import unittest
+import urllib.error
+import urllib.request
 import zipfile
+from pathlib import Path
 from unittest import mock
 
 import base_rb
@@ -16,7 +19,7 @@ import entorno
 import requests
 from pyrekordbox.masterdb import models as m
 
-from kramer import backups, config, historial, nube, plataforma, rb, respaldo, servidor
+from kramer import archivos, backups, config, historial, ingreso, nombres, nube, plataforma, rb, respaldo, servidor
 
 
 class Deshacer(unittest.TestCase):
@@ -185,6 +188,104 @@ class BaseDeRekordbox(unittest.TestCase):
         rb.editar_mytags([{"cat": "4", "accion": "renombrar", "id": tags["Main"], "nombre": "Peak"}])
         with historial.Operacion("Sincronizar") as op:
             rb.aplicar({"meta": {}, "momento": {cid: "Peak"}, "tags": {}}, op.respaldar_archivo, lambda s: None)
+
+
+class NombresProlijos(unittest.TestCase):
+    @unittest.expectedFailure
+    def test_titulos_que_empiezan_con_un_numero(self):
+        """Al limpiar el título se saca el «número de pista» del principio aunque sea parte del nombre:
+        «7 rings» queda «Rings» y «99 Problems» queda «Problems», en la etiqueta y en el nombre del archivo."""
+        self.assertEqual(nombres.prolijo("Ariana Grande", "7 rings")[1], "7 Rings")
+        self.assertEqual(nombres.prolijo("Jay-Z", "99 Problems")[1], "99 Problems")
+
+    @unittest.expectedFailure
+    def test_el_titulo_nunca_queda_vacio(self):
+        """Un tema que se llama «4K» o «HD» queda sin título (se toma por ruido), y sin artista el archivo
+        pasa a llamarse «.mp3», que en Mac es un archivo oculto."""
+        self.assertEqual(nombres.prolijo("El Alfa", "4K")[1], "4K")
+        self.assertNotEqual(nombres.nombre_archivo("", "HD", ".mp3"), ".mp3")
+
+    @unittest.expectedFailure
+    def test_clean_y_explicit_son_versiones_distintas(self):
+        """«(Clean)» y «(Explicit)» se sacan como ruido: las dos versiones quedan con el mismo título
+        y el paso 2 marca la segunda como duplicado para eliminar."""
+        self.assertNotEqual(nombres.prolijo("Cardi B", "WAP (Clean)"), nombres.prolijo("Cardi B", "WAP (Explicit)"))
+
+    @unittest.expectedFailure
+    def test_artistas_con_x_o_con_coma_en_el_nombre(self):
+        """«Lil Nas X & Jack Harlow» queda «Lil Nas & & Jack Harlow» y «Tyler, The Creator» queda «Tyler & The Creator»."""
+        self.assertEqual(nombres.prolijo("Lil Nas X & Jack Harlow", "Industry Baby")[0], "Lil Nas X & Jack Harlow")
+        self.assertEqual(nombres.prolijo("Tyler, The Creator", "Earfquake")[0], "Tyler, The Creator")
+
+
+class Descargas(unittest.TestCase):
+    def setUp(self):
+        self.d = base_rb.crear()
+
+    @unittest.expectedFailure
+    def test_cambiar_el_pais_no_borra_el_idioma(self):
+        """En el paso 2, si se guarda sólo el país, el idioma que ya tenía el comentario se borra
+        (y con él los My Tags automáticos de idioma)."""
+        ruta = base_rb.audio(self.d / "descargas" / "tema.mp3")
+        archivos.escribir(ruta, {"titulo": "Tema", "artista": "Artista", "comentario": "País: Argentina | Idioma: Español"})
+        with historial.Operacion("Preparar descargas", con_base=False) as op:
+            ingreso.aplicar_metadata([{"ruta": str(ruta), "meta": {"pais": "Uruguay"}}], op, lambda s: None)
+        comentarios = [archivos.leer(p)["comentario"] for p in (self.d / "descargas").glob("*.mp3")]
+        self.assertEqual(comentarios, ["País: Uruguay | Idioma: Español"])
+
+    @unittest.expectedFailure
+    def test_ve_las_subcarpetas_aunque_el_nombre_empiece_igual_que_la_coleccion(self):
+        """Si la carpeta de descargas se llama como la colección más algo («Musica» y «Musica nueva»),
+        la app saltea todas sus subcarpetas sin avisar."""
+        descargas = self.d / "coleccion nueva"
+        base_rb.audio(descargas / "pack" / "adentro.mp3")
+        config.guardar({"incorporar": str(descargas)})
+        self.assertEqual([Path(x["ruta"]).name for x in ingreso.listar()], ["adentro.mp3"])
+
+    @unittest.expectedFailure
+    def test_incorporar_solo_acepta_archivos_de_descargas(self):
+        """El paso 3 mueve a la colección cualquier archivo cuya ruta le llegue, esté donde esté en el disco."""
+        ajeno = base_rb.audio(self.d / "otra carpeta" / "ajeno.mp3")
+        with mock.patch.object(rb, "rekordbox_abierto", return_value=False):
+            with self.assertRaises(servidor.Error):
+                servidor.api_incorporar({"rutas": [str(ajeno)], "playlistFecha": False})
+        self.assertTrue(ajeno.is_file())
+
+
+class ServidorLocal(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.srv = servidor.crear(0)
+        threading.Thread(target=cls.srv.serve_forever, daemon=True).start()
+        cls.addClassCleanup(cls.srv.server_close)
+        cls.addClassCleanup(cls.srv.shutdown)
+
+    @unittest.expectedFailure
+    def test_no_acepta_pedidos_de_otra_pagina(self):
+        """El servidor de la app no mira de dónde viene cada pedido: una página cualquiera abierta en el navegador
+        de la misma computadora puede mandarle órdenes. Un pedido que declara otro origen tiene que ser rechazado."""
+        pedido = urllib.request.Request(f"http://127.0.0.1:{self.srv.server_address[1]}/api/pendiente",
+                                        data=json.dumps({"id": "1", "momento": "Peak"}).encode(),
+                                        headers={"Origin": "https://ejemplo.com", "Content-Type": "text/plain"})
+        with self.assertRaises(urllib.error.HTTPError) as error:
+            urllib.request.urlopen(pedido, timeout=10).close()
+        self.assertEqual(error.exception.code, 403)
+
+    @unittest.expectedFailure
+    def test_ajustes_no_acepta_cualquier_valor(self):
+        """Ajustes guarda lo que le llegue, del tipo que sea: un valor mal formado deja la app sin poder abrir
+        hasta editar config.json a mano, y las carpetas no se revisan."""
+        self.addCleanup(config.guardar, {"respaldo_destino": ""})
+        with self.assertRaises(servidor.Error):
+            servidor.api_config({"respaldo_destino": 5})
+
+    @unittest.expectedFailure
+    def test_la_interfaz_no_recibe_las_claves_guardadas(self):
+        """La pantalla recibe las claves de Last.fm, Discogs, Spotify y YouTube tal cual están guardadas;
+        alcanza con decirle si están cargadas o no."""
+        config.guardar({"lastfm": "clave-secreta-de-prueba"})
+        self.addCleanup(config.guardar, {"lastfm": ""})
+        self.assertNotIn("clave-secreta-de-prueba", json.dumps(servidor.api_estado({})))
 
 
 if __name__ == "__main__":
