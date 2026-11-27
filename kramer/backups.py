@@ -21,6 +21,9 @@ def _tam(p):
     return total
 
 
+LEGADO = {"_BACKUP originales"}      # backups de las primeras versiones, que vivían sueltos en la carpeta
+
+
 def listar():
     raiz = Path(config.cargar()["backup"])
     ops = {h["id"]: h for h in historial.listar()}
@@ -36,7 +39,7 @@ def listar():
                               "deshecho": bool(h and h.get("deshecho")), "bytes": _tam(d)})
     if raiz.is_dir():
         for d in raiz.iterdir():
-            if d.name.startswith(".") or d == app:
+            if d.name not in LEGADO:         # nunca el backup completo ni carpetas ajenas que haya en ese lugar
                 continue
             fecha = datetime.datetime.fromtimestamp(d.stat().st_mtime)
             items.append({"ruta": str(d), "nombre": d.name, "tipo": "otro", "fecha": fecha.strftime("%Y-%m-%d"),
@@ -46,12 +49,12 @@ def listar():
 
 
 def borrar(rutas):
-    raiz = Path(config.cargar()["backup"]).resolve()
+    ofrecidos = {Path(i["ruta"]).resolve() for i in listar()["items"]}
     liberado, errores = 0, []
     for r in rutas:
         p = Path(r).resolve()
-        if raiz not in p.parents:                 # nunca fuera de la carpeta de backups
-            errores.append(f"{p.name}: está fuera de la carpeta de backups")
+        if p not in ofrecidos:                    # sólo lo que la pantalla ofrece: backups de operaciones
+            errores.append(f"{p.name}: no es un backup de la app")
             continue
         try:
             t = _tam(p)

@@ -117,23 +117,16 @@ class Sincronizar(ConBase):
         self.assertEqual(len(r["errores"]), 1)
         self.assertEqual((base_rb.tema(self.cid)["anio"], base_rb.tema(self.cid)["titulo"]), (1990, "Nuevo"))
 
-    @unittest.expectedFailure
     def test_comentario_editado_junto_con_el_pais(self):
-        """Hoy, si en el mismo guardado cambian el comentario y el país, el comentario nuevo se pierde
-        (ver la revisión, «Sincronizar»)."""
         self.aplicar(meta={self.cid: {"comentario": "pedido por la novia", "pais": "Argentina"}})
         self.assertIn("pedido por la novia", archivos.leer(self.ruta)["comentario"])
 
-    @unittest.expectedFailure
     def test_comentario_editado_llega_a_la_base(self):
-        """Hoy el comentario se escribe en el archivo pero no en Rekordbox (ver la revisión, «Sincronizar»)."""
         self.aplicar(meta={self.cid: {"comentario": "pedido por la novia"}})
         self.assertEqual(archivos.leer(self.ruta)["comentario"], "pedido por la novia")
         self.assertEqual(base_rb.tema(self.cid)["comentario"], "pedido por la novia")
 
-    @unittest.expectedFailure
     def test_el_resumen_cuenta_los_momentos(self):
-        """Hoy el resumen informa 0 momentos aunque se haya guardado uno (ver la revisión, «Sincronizar»)."""
         self.assertEqual(self.aplicar(momento={self.cid: "Peak"})["momento"], 1)
 
 

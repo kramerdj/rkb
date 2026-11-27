@@ -146,46 +146,35 @@ def api_tema(q):
     return t
 
 
-def api_pendiente(b):
-    p = config.pendientes()
-    tid = str(b["id"])
-    if b.get("quitarMomento"):
+def _anotar_pendiente(p, it):
+    tid = str(it["id"])
+    if it.get("quitarMomento"):
         p["momento"].pop(tid, None)
-    elif "momento" in b:
-        p["momento"][tid] = b["momento"] or ""
-    if "meta" in b:
-        meta = {k: str(v).strip() for k, v in b["meta"].items()}
+    elif "momento" in it:
+        p["momento"][tid] = it["momento"] or ""
+    if "meta" in it:
+        meta = {k: str(v).strip() for k, v in it["meta"].items()}
         if meta:
             p["meta"][tid] = meta
         else:
             p["meta"].pop(tid, None)
-    if b.get("descartar"):
-        p["momento"].pop(tid, None)
-        p["meta"].pop(tid, None)
-        p.setdefault("tags", {}).pop(tid, None)
-    config.guardar_pendientes(p)
-    return {"pendientes": p}
+    if "tags" in it:
+        p["tags"][tid] = {str(k): list(v) for k, v in it["tags"].items()}
+    if it.get("descartar"):
+        for parte in ("momento", "meta", "tags"):
+            p[parte].pop(tid, None)
+
+
+def api_pendiente(b):
+    return {"pendientes": config.cambiar_pendientes(lambda p: _anotar_pendiente(p, {k: v for k, v in b.items() if k != "tags"}))}
 
 
 def api_pendiente_lote(b):
     """items: [{id, meta?: {...} (reemplaza), momento?: str, quitarMomento?: bool}]"""
-    p = config.pendientes()
-    for it in b.get("items", []):
-        tid = str(it["id"])
-        if it.get("quitarMomento"):
-            p["momento"].pop(tid, None)
-        elif "momento" in it:
-            p["momento"][tid] = it["momento"] or ""
-        if "meta" in it:
-            meta = {k: str(v).strip() for k, v in it["meta"].items()}
-            if meta:
-                p["meta"][tid] = meta
-            else:
-                p["meta"].pop(tid, None)
-        if "tags" in it:
-            p.setdefault("tags", {})[tid] = {str(k): list(v) for k, v in it["tags"].items()}
-    config.guardar_pendientes(p)
-    return {"pendientes": p}
+    def lote(p):
+        for it in b.get("items", []):
+            _anotar_pendiente(p, {k: v for k, v in it.items() if k != "descartar"})
+    return {"pendientes": config.cambiar_pendientes(lote)}
 
 
 def api_descartar(_):
@@ -208,7 +197,12 @@ def api_sincronizar(_):
     with historial.Operacion("Sincronizar " + " y ".join(partes)) as op:
         r = rb.aplicar(p, op.respaldar_archivo, lambda s: None)
         op.detalle = "archivos + Rekordbox" if p["meta"] else "solo Rekordbox"
-    config.guardar_pendientes({"momento": {}, "meta": {}, "tags": {}})
+    def quitar_aplicados(actual):       # lo que se anotó mientras corría la sincronización sigue pendiente
+        for parte in ("momento", "meta", "tags"):
+            for tid, valor in p[parte].items():
+                if actual[parte].get(tid) == valor:
+                    del actual[parte][tid]
+    config.cambiar_pendientes(quitar_aplicados)
     return {"mensaje": "Listo: " + " y ".join(partes) + ".", "errores": r["errores"]}
 
 
@@ -373,9 +367,17 @@ def api_lista_evento(b):
 
 
 def api_abrir(b):
-    ruta = b.get("ruta", "")
-    if ruta and Path(ruta).exists():
-        plataforma.mostrar(ruta) if b.get("mostrar") else plataforma.abrir(ruta)
+    """Muestra en la carpeta un archivo de las carpetas de trabajo de la app, o abre un .txt de ahí (la lista depurada)."""
+    c = config.cargar()
+    p = Path(str(b.get("ruta") or "")).resolve()
+    if not p.is_file() or not any(Path(c[k]).resolve() in p.parents for k in ("incorporar", "coleccion", "backup")):
+        raise Error("Ese archivo no está en las carpetas de la app.")
+    if b.get("mostrar"):
+        plataforma.mostrar(str(p))
+    elif p.suffix.lower() == ".txt":
+        plataforma.abrir(str(p))
+    else:
+        raise Error("Desde acá sólo se abren las listas en .txt.")
     return {"ok": True}
 
 
@@ -449,6 +451,9 @@ def api_incorporar(b):
         raise Error("No hay temas para incorporar.")
     if not Path(config.cargar()["coleccion"]).is_dir():
         raise Error("La carpeta de la colección no existe. Elegila en Ajustes → Carpetas antes de incorporar temas.")
+    preparados = {rb._clave_path(p["ruta"]) for p in ingreso.leer_preparados()}
+    if any(rb._clave_path(r) not in preparados for r in rutas):
+        raise Error("Alguno de esos temas no está en la lista de preparados. Volvé a abrir el paso 3 y probá de nuevo.")
     with historial.Operacion(f"Incorporar {len(rutas)} temas") as op:
         r = ingreso.incorporar(rutas, b.get("playlist"), op, lambda s: None, b.get("playlistFecha", True))
         op.detalle = f"movidos a la colección y agregados a Rekordbox" + (
@@ -731,8 +736,32 @@ def api_nube_moderar(nube, b):
     return {"mensaje": "Publicado." if b.get("estado") == "publicado" else "Rechazado."}
 
 
+CARPETAS_DE_AJUSTES = ("coleccion", "incorporar", "backup", "rekordbox", "respaldo_destino")
+
+
+def _validar_ajustes(b):
+    """Cada ajuste tiene que ser del mismo tipo que su valor de fábrica; las carpetas, rutas completas."""
+    for k, v in b.items():
+        if k not in config.DEFAULT:
+            continue
+        fabrica = config.DEFAULT[k]
+        if k in CARPETAS_DE_AJUSTES:
+            bien = isinstance(v, str) and (Path(v).is_absolute() or (v == "" and k == "respaldo_destino"))
+        elif isinstance(fabrica, bool):
+            bien = isinstance(v, bool)
+        elif isinstance(fabrica, int):
+            bien = isinstance(v, (int, float)) and not isinstance(v, bool)
+        elif isinstance(fabrica, (str, list)):
+            bien = isinstance(v, type(fabrica))
+        else:
+            bien = v is None or isinstance(v, (dict, list))
+        if not bien:
+            raise Error(f"El ajuste «{k}» no tiene un valor válido.")
+
+
 def api_config(b):
     b = {k: v for k, v in b.items() if k not in ("nube_sesion", "spotify_refresh")}
+    _validar_ajustes(b)
     return {"config": {k: v for k, v in config.guardar(b).items() if k not in ("nube_sesion", "spotify_refresh", "cartelera_vistos")}}
 
 
@@ -853,11 +882,25 @@ class Handler(BaseHTTPRequestHandler):
                        f"({getattr(e, 'filename', '') or e}).\n\nSolución: Ajustes del Sistema → Privacidad y "
                        "seguridad → Acceso total al disco → activá «RKB Collection Manager» y volvé a abrir la app.")
             self._json({"error": msg}, 403)
+        except ValueError as e:
+            traceback.print_exc()
+            self._json({"error": str(e)}, 400)
         except Exception as e:
             traceback.print_exc()
             self._json({"error": f"{type(e).__name__}: {e}"}, 500)
 
+    def _de_la_app(self):
+        """Sólo se atiende a la página de la app. Cualquier otra página abierta en un navegador de esta computadora
+        puede mandar pedidos a 127.0.0.1, pero no puede cambiar su «Origin» ni hacerse pasar por este «Host»."""
+        puerto = self.server.server_address[1]
+        propios = {f"127.0.0.1:{puerto}", f"localhost:{puerto}"}
+        origen = self.headers.get("Origin")
+        return self.headers.get("Host") in propios and (origen is None or origen in {f"http://{h}" for h in propios})
+
     def do_GET(self):
+        if not self._de_la_app():
+            self.send_error(403)
+            return
         u = urlparse(self.path)
         if u.path in GET:
             return self._api(GET[u.path], parse_qs(u.query))
@@ -882,6 +925,9 @@ class Handler(BaseHTTPRequestHandler):
         self.wfile.write(datos)
 
     def do_POST(self):
+        if not self._de_la_app() or not self.headers.get("Content-Type", "").startswith("application/json"):
+            self.send_error(403)
+            return
         u = urlparse(self.path)
         largo = int(self.headers.get("Content-Length") or 0)
         try:

@@ -33,11 +33,16 @@ def abrir():
     if not ruta.is_file():
         raise SinRekordbox("No encuentro la base de Rekordbox en esta computadora. ¿Está instalado Rekordbox 6 o 7 "
                            "y lo abriste al menos una vez? Si la base está en otro lugar, elegila en Ajustes → Base de Rekordbox.")
-    if os.environ.get("KRAMER_RB_TEST"):
-        return MasterDatabase(path=str(ruta), unlock=False)
-    if ruta.parent == plataforma.dir_rekordbox():
-        return MasterDatabase()
-    return MasterDatabase(path=str(ruta))
+    # Siempre la base de Ajustes: es la misma que se respalda antes de cada cambio y la que devuelve Deshacer.
+    db = MasterDatabase(path=str(ruta), unlock=False) if os.environ.get("KRAMER_RB_TEST") else MasterDatabase(path=str(ruta))
+    cerrar_sesion = db.close
+
+    def cerrar():
+        cerrar_sesion()
+        db.engine.dispose()         # suelta master.db: Windows no deja reemplazar un archivo abierto
+
+    db.close = cerrar
+    return db
 
 
 def carpeta_sugerida():
@@ -94,10 +99,14 @@ def ids_categorias(db):
 
 
 def tags_automaticos(db, cid, datos, ahora):
-    """Pone los tags de las categorías automáticas de un tema (según Ajustes de My Tags)."""
+    """Pone los tags de las categorías automáticas de un tema (según Ajustes de My Tags).
+    Una categoría se toca recién cuando en Rekordbox ya lleva el nombre de la app, o sea, después de
+    «Actualizar base de Rekordbox» en el paso 4: antes de eso puede tener tags propios del usuario."""
     ids = ids_categorias(db)
+    en_base = {str(t.ID): t.Name for t in db.query(m.DjmdMyTag).filter(m.DjmdMyTag.ParentID == "root")}
     for cat in categorias.automaticas():
-        _poner_tags(db, str(cid), ids[cat["id"]], categorias.calcular(cat["fuente"], datos), ahora)
+        if en_base.get(ids[cat["id"]]) == cat["nombre"]:
+            _poner_tags(db, str(cid), ids[cat["id"]], categorias.calcular(cat["fuente"], datos), ahora)
 
 
 # =============================================================================
@@ -225,7 +234,7 @@ def _por_nombre(db, modelo, getter, alta, nombre):
 
 def _tag_en_categoria(db, cat, nombre, ahora):
     t = (db.query(m.DjmdMyTag).filter(m.DjmdMyTag.ParentID == cat, m.DjmdMyTag.Name == nombre)
-         .one_or_none())
+         .order_by(m.DjmdMyTag.Seq).first())
     if t is not None:
         return t
     seq = db.query(m.DjmdMyTag).filter(m.DjmdMyTag.ParentID == cat).count() + 1
@@ -272,10 +281,11 @@ def aplicar(pend, respaldar_archivo, log):
                 pais0, idioma0 = archivos.pais_idioma(actual.get("comentario") or c.Commnt or "")
                 pais = cambios.get("pais", pais0)
                 idioma = cambios.get("idioma", idioma0)
-                comentario = archivos.armar_comentario(actual.get("comentario") or c.Commnt or "",
-                                                       pais, idioma)
+                texto = cambios["comentario"] if "comentario" in cambios else (actual.get("comentario") or c.Commnt or "")
+                comentario = archivos.armar_comentario(texto, pais, idioma)
+                con_comentario = any(k in cambios for k in ("comentario", "pais", "idioma"))
                 al_archivo = {k: v for k, v in cambios.items() if k in archivos.CAMPOS}
-                if "pais" in cambios or "idioma" in cambios:
+                if con_comentario:
                     al_archivo["comentario"] = comentario
                 if Path(ruta).is_file() and al_archivo:
                     try:
@@ -300,7 +310,7 @@ def aplicar(pend, respaldar_archivo, log):
                         c.ReleaseYear = int(str(cambios["anio"])[:4]) if cambios["anio"] else None
                     except ValueError:
                         resumen["errores"].append(f"{c.Title}: año inválido '{cambios['anio']}'")
-                if "pais" in cambios or "idioma" in cambios:
+                if con_comentario:
                     c.Commnt = comentario
                 c.updated_at = ahora
                 # My Tags automáticos del tema
@@ -313,6 +323,7 @@ def aplicar(pend, respaldar_archivo, log):
                 if db.get_content(ID=cid) is None:
                     continue
                 _poner_tags(db, cid, ids[CAT_MOMENTO], [mom] if mom else [], ahora)
+                resumen["momento"] += 1
             manuales = {k["id"] for k in categorias.cargar() if k["fuente"] == "manual"}
             for cid, por_cat in pend.get("tags", {}).items():
                 if db.get_content(ID=cid) is None:
@@ -394,12 +405,12 @@ def _norm_keep(s):
 
 def mismo_path(a, b):
     """macOS no distingue acentos compuestos/descompuestos ni mayúsculas: compara así."""
-    n = lambda x: unicodedata.normalize("NFC", x or "").casefold()
-    return n(a) == n(b)
+    return _clave_path(a) == _clave_path(b)
 
 
 def _clave_path(x):
-    return unicodedata.normalize("NFC", str(x or "")).casefold()
+    """Rekordbox guarda las rutas con «/» también en Windows, donde el sistema las arma con «\\»."""
+    return unicodedata.normalize("NFC", str(x or "")).casefold().replace("\\", "/")
 
 
 def _cues_por_tema(db):
@@ -655,7 +666,11 @@ def editar_mytags(cambios):
                     if t is None:
                         continue
                     if acc == "renombrar" and (c.get("nombre") or "").strip():
-                        t.Name, t.updated_at = c["nombre"].strip(), ahora
+                        nuevo = c["nombre"].strip()
+                        if db.query(m.DjmdMyTag).filter(m.DjmdMyTag.ParentID == cat, m.DjmdMyTag.Name == nuevo,
+                                                        m.DjmdMyTag.ID != t.ID).count():
+                            raise ValueError(f"Ya hay un tag que se llama «{nuevo}» en esa categoría.")
+                        t.Name, t.updated_at = nuevo, ahora
                     elif acc == "borrar":
                         for a in list(db.query(m.DjmdSongMyTag).filter(m.DjmdSongMyTag.MyTagID == t.ID)):
                             db.delete(a)
@@ -742,9 +757,9 @@ def renombrar(cambios, op, log):
                 os.rename(viejo, nuevo)
                 renombrados[str(nuevo)] = str(viejo)
                 try:
-                    db.update_content_path(c, str(nuevo), save=True, check_path=True, commit=False)
+                    db.update_content_path(c, nuevo.as_posix(), save=True, check_path=True, commit=False)
                 except Exception:
-                    c.FolderPath = str(nuevo)          # si el análisis no se puede leer, al menos la base
+                    c.FolderPath = nuevo.as_posix()    # si el análisis no se puede leer, al menos la base
                     c.FileNameL = nuevo.name
                 hechos += 1
                 log(f"{viejo.name} -> {nuevo.name}")
@@ -804,8 +819,10 @@ def sincronizar_categorias(simular=True, leer_archivos=True):
                     for n in s:
                         cuenta[n] += 1
                 cambios = sum(1 for cid in datos if deseado[cid] != actuales[cat].get(cid, set()))
+                propios = [tags - set(cuenta) for tags in actuales[cat].values() if tags - set(cuenta)]
                 resumen.append({**cfg, "cambios": cambios,
-                                "tags": {n: cuenta[n] for n in categorias.orden(cfg["fuente"], cuenta)}})
+                                "tags": {n: cuenta[n] for n in categorias.orden(cfg["fuente"], cuenta)},
+                                "seQuitan": {"temas": len(propios), "tags": sorted(set().union(*propios))}})
                 if simular:
                     continue
                 for cid in datos:

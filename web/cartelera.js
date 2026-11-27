@@ -1,5 +1,6 @@
 /* RKB Collection Manager · versión obligatoria, Cartelera y Mis anuncios */
 'use strict';
+const urlCss = (u) => esc(encodeURI(String(u || ''))).replace(/'/g, '%27').replace(/\\/g, '%5C');
 
 const CT = { activo: false, nuevos: 0, anuncios: [], tipo: 'Todos', ubic: { pais: '', region: '' }, nov: null };
 const MA = { quien: null, anuncios: [], email: '', pend: [] };
@@ -129,7 +130,7 @@ async function pintarCartelera(forzar) {
 }
 function tarjeta(a, extra) {
   return `<article class="ct-card${a.destacado ? ' dest' : ''}">
-    ${a.imagen ? `<div class="ct-img" style="background-image:url('${esc(a.imagen)}')"></div>` : `<div class="ct-img vacia"><span>${esc(a.tipo || '')}</span></div>`}
+    ${a.imagen ? `<div class="ct-img" style="background-image:url('${urlCss(a.imagen)}')"></div>` : `<div class="ct-img vacia"><span>${esc(a.tipo || '')}</span></div>`}
     <div class="ct-info">
       <div class="ct-chips"><span class="chip">${esc(a.tipo)}</span>${a.destacado ? '<span class="chip posible">Destacado</span>' : ''}${a.alcance === 'mundo' ? '<span class="chip">Todo el mundo</span>' : ''}</div>
       <h3>${esc(a.titulo)}</h3>
@@ -237,7 +238,7 @@ function formAnuncio(a) {
     <label class="ancho">¿Quién lo ve?<select id="faAlcance">${ALCANCES.map(([v, t]) => `<option value="${v}" ${v === (a.alcance || 'region') ? 'selected' : ''}>${t}</option>`).join('')}</select></label>
     <label class="ancho">Texto <small id="faCuenta"></small><textarea id="faTexto" maxlength="600" rows="4" placeholder="Contá de qué se trata, precio, contacto…">${esc(a.texto || '')}</textarea></label>
     <label class="ancho">Link (opcional)<input id="faLink" value="${esc(a.link || '')}" placeholder="Instagram, entradas, WhatsApp…"></label>
-    <div class="ancho fa-img"><div class="fa-prev" id="faPrev" style="${a.imagen ? `background-image:url('${esc(a.imagen)}')` : ''}">${a.imagen ? '' : 'Sin imagen'}</div>
+    <div class="ancho fa-img"><div class="fa-prev" id="faPrev" style="${a.imagen ? `background-image:url('${urlCss(a.imagen)}')` : ''}">${a.imagen ? '' : 'Sin imagen'}</div>
       <div class="acciones"><button type="button" class="btn chico" id="faElegir">${a.imagen ? 'Cambiar imagen' : 'Agregar flyer o foto'}</button><button type="button" class="btn chico" id="faQuitar" ${a.imagen ? '' : 'hidden'}>Quitar</button></div><input type="file" id="faArchivo" accept="image/*" hidden></div>
     <label class="ancho fa-acepto"><input type="checkbox" id="faAcepto" ${a.id ? 'checked' : ''}> El anuncio es real y es mío. Sé que se revisa antes de publicarse y que puede rechazarse si no tiene que ver con la música o los DJs.</label>
   </div>${a.id && a.estado === 'publicado' ? '<p class="nota">Al editarlo vuelve a revisión hasta que se apruebe de nuevo.</p>' : ''}`, [

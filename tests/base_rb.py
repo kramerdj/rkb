@@ -24,8 +24,9 @@ def audio(ruta, segundos=1, formato=None):
     return ruta
 
 
-def crear(ids_categorias=("1", "2", "3", "4")):
-    """Crea la base vacía, la deja como la base de la app y devuelve su carpeta."""
+def crear(ids_categorias=("1", "2", "3", "4"), paso_4=True):
+    """Crea la base vacía, la deja como la base de la app y devuelve su carpeta.
+    paso_4: como si ya se hubiera corrido «Actualizar base de Rekordbox» (las categorías llevan los nombres de la app)."""
     os.environ["KRAMER_RB_TEST"] = "1"
     carpeta = entorno.carpeta()
     motor = create_engine(f"sqlite:///{carpeta / 'master.db'}")
@@ -53,6 +54,8 @@ def crear(ids_categorias=("1", "2", "3", "4")):
                     "incorporar": str(carpeta / "descargas"), "backup": str(carpeta / "backup")})
     (carpeta / "coleccion").mkdir()
     (carpeta / "descargas").mkdir()
+    if paso_4:
+        rb.sincronizar_categorias(simular=False, leer_archivos=False)
     return carpeta
 
 

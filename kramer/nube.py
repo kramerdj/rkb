@@ -28,7 +28,7 @@ _lock = threading.Lock()
 
 
 class ErrorNube(Exception):
-    pass
+    codigo = None           # código HTTP con que respondió el servidor; None si no hubo respuesta
 
 
 def configurado():
@@ -54,7 +54,9 @@ def _pedir(metodo, ruta, token=None, timeout=8, **kw):
             msg = d.get("msg") or d.get("message") or d.get("error_description") or d.get("error") or r.text
         except ValueError:
             msg = r.text
-        raise ErrorNube(_traducir(str(msg), r.status_code))
+        error = ErrorNube(_traducir(str(msg), r.status_code))
+        error.codigo = r.status_code
+        raise error
     if r.status_code == 204 or not r.content:
         return None
     try:
@@ -81,9 +83,12 @@ def _traducir(msg, code):
 # =============================================================================
 def _num(v):
     try:
-        return tuple(int(x) for x in str(v).strip().split("."))
+        n = [int(x) for x in str(v).strip().split(".")]
     except ValueError:
         return (0,)
+    while len(n) > 1 and n[-1] == 0:        # «0.9.1.0» es la misma versión que «0.9.1»
+        n.pop()
+    return tuple(n)
 
 
 CONTROL_URL = os.environ.get("KRAMER_CONTROL_URL",
@@ -125,11 +130,12 @@ def novedades(version_actual, forzar=False):
     link = d.get("link_win") if os.name == "nt" else d.get("link_mac")
     res["link"] = str(link or DESCARGA.format("Windows" if os.name == "nt" else "Mac"))
     minima = d.get("minima")
-    if minima and _num(minima) > actual:
+    # Una mínima más nueva que la última publicada no se puede cumplir (error de tipeo): no obliga a nadie.
+    if minima and _num(ultima) >= _num(minima) > actual:
         desde = d.get("minima_desde") or datetime.date.today().isoformat()
         try:
             limite = datetime.date.fromisoformat(str(desde)[:10]) + datetime.timedelta(days=int(d.get("gracia_dias") or 0))
-        except ValueError:
+        except (ValueError, TypeError, OverflowError):
             limite = datetime.date.today()
         faltan = (limite - datetime.date.today()).days
         res["minima"] = str(minima)
@@ -245,7 +251,9 @@ def token():
         return s
     try:
         d = _pedir("POST", "/auth/v1/token?grant_type=refresh_token", json={"refresh_token": s["refresh"]})
-    except ErrorNube:
+    except ErrorNube as e:
+        if e.codigo not in (400, 401, 403):     # sin internet o servidor caído: la sesión sigue valiendo
+            raise
         _guardar_sesion(None)
         raise ErrorNube("Tu sesión venció. Volvé a entrar con tu email.")
     return _tomar_token(d)

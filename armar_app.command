@@ -77,7 +77,7 @@ echo " · Para compartir: $SALIDA/RKB Collection Manager (Mac).zip"
 
 # 6) reemplazar la versión instalada en esta Mac (con KRAMER_SALIDA sólo se arma, no se instala)
 if [ -n "$KRAMER_SALIDA" ]; then exit 0; fi
-curl -s -m 1 -X POST http://127.0.0.1:8765/api/salir >/dev/null 2>&1 || true
+curl -s -m 1 -X POST -H "Content-Type: application/json" -d "{}" http://127.0.0.1:8765/api/salir >/dev/null 2>&1 || true
 rm -rf "/Applications/Kramer DJ.app" "$HOME/Applications/Kramer DJ.app"   # versión vieja
 rm -rf "/Applications/RKB Collection Manager.app"
 ditto "$APP" "/Applications/RKB Collection Manager.app"

@@ -61,7 +61,7 @@ cat > "$APPB/Contents/Info.plist" <<PL
 PL
 
 # si el motor viejo está corriendo, se reinicia con la versión nueva
-curl -s -m 1 -X POST http://127.0.0.1:8765/api/salir >/dev/null 2>&1 || true
+curl -s -m 1 -X POST -H "Content-Type: application/json" -d "{}" http://127.0.0.1:8765/api/salir >/dev/null 2>&1 || true
 sleep 1
 echo ""
 echo "Listo: la app quedó en $APPB"

@@ -18,7 +18,7 @@ async function pintarRespaldo() {
   }
   // bases
   $('#rsBases').innerHTML = d.bases.length ? d.bases.map((b, i) => `<div class="rs-item"><div><b>${esc(fechaTxt(b.fecha))}</b>${b.motivo === 'antes de restaurar' ? ' <span class="nota">(guardada antes de restaurar)</span>' : ''}
-      <small>${b.temas != null ? `${b.temas} temas · ${b.playlists} playlists · ` : ''}${b.share ? 'con análisis · ' : ''}${tamTxt(b.bytes)}${b.sistema ? ' · ' + (b.sistema === 'windows' ? 'Windows' : 'Mac') : ''}${b.valido ? '' : ' · <b>no se pudo leer</b>'}</small></div>
+      <small>${b.temas != null ? `${esc(b.temas)} temas · ${esc(b.playlists)} playlists · ` : ''}${b.share ? 'con análisis · ' : ''}${tamTxt(b.bytes)}${b.sistema ? ' · ' + (b.sistema === 'windows' ? 'Windows' : 'Mac') : ''}${b.valido ? '' : ' · <b>no se pudo leer</b>'}</small></div>
       <div class="acciones"><button type="button" class="btn chico" data-rsborrar="${i}">Borrar</button><button type="button" class="btn chico" data-rsbase="${i}" ${b.valido ? '' : 'disabled'}>Restaurar</button></div></div>`).join('')
     : '<p class="rs-vacio">Todavía no hay backups de la base en esta carpeta.</p>';
   // colección

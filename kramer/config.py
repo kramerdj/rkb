@@ -95,3 +95,14 @@ def pendientes():
 def guardar_pendientes(p):
     with _lock:
         _escribir(PENDIENTES, p)
+
+
+def cambiar_pendientes(cambio):
+    """Lee, cambia y guarda de una sola vez: dos pedidos a la vez no se pisan. cambio(p) modifica p."""
+    with _lock:
+        p = _leer(PENDIENTES, {})
+        for k in ("momento", "meta", "tags"):
+            p.setdefault(k, {})
+        cambio(p)
+        _escribir(PENDIENTES, p)
+        return p

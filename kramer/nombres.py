@@ -12,12 +12,14 @@ import unicodedata
 
 RUIDO = re.compile(
     r"\s*[\(\[\{][^\)\]\}]*\b(official|oficial|video|v[ií]deo|audio|lyrics?|letra|visuali[sz]er|"
-    r"hd|hq|4k|1080p|720p|320|kbps|bpm|explicit|clean|videoclip|clip|premiere|estreno)\b[^\)\]\}]*[\)\]\}]",
+    r"hd|hq|4k|1080p|720p|320|kbps|bpm|videoclip|clip|premiere|estreno)\b[^\)\]\}]*[\)\]\}]",
     re.I)
 RUIDO_SUELTO = re.compile(r"\s*\b(official (music )?video|video oficial|official audio|audio oficial|lyric video|"
                           r"videoclip oficial|hd|4k)\s*$", re.I)
 PISTA_CD = re.compile(r"\s*\bCD\s*\d+\s*TRACK\s*\d+\b.*$", re.I)
-NUM_INICIAL = re.compile(r"^\s*\d{1,2}\s*[\.\-_)]?\s+(?=\D)")
+NUM_INICIAL = re.compile(r"^\s*(?:\d{1,2}\s*[\.\-)]|0\d)\s+(?=\D)")     # «01 Tema», «3. Tema»; no «7 rings» ni «99 Problems»
+ENTEROS = {"tyler, the creator", "earth, wind & fire", "crosby, stills & nash", "crosby, stills, nash & young",
+           "emerson, lake & palmer", "blood, sweat & tears", "peter, paul and mary"}
 COPIA_FINAL = re.compile(r"(\s*\(\d\)|\s*-\d|\s+copia)$", re.I)
 FEAT = re.compile(r"\s*[\(\[]?\s*\b(?:feat\.?|ft\.?|featuring)\s+([^\)\]]+?)\s*[\)\]]?(?=\s*[\(\[]|$)", re.I)
 VERSION = re.compile(r"\b(remix|mix|edit|version|versi[oó]n|extended|radio|live|en vivo|ac[uú]stic[oa]|"
@@ -76,7 +78,9 @@ def separar_artistas(a, conocidos=None):
     Los dúos con '&' o 'y' no se tocan; 'AC/DC' tampoco."""
     a = _espacios(a)
     a = re.sub(r"\s*-\s*Topic\b", "", a, flags=re.I)
-    partes = re.split(r"\s*(?:,|;|\s/\s?|/\s|\s[xX]\s|\svs\.?\s|-\s)\s*", a)
+    if a.lower() in ENTEROS or (conocidos and a.lower() in conocidos):
+        return [a]
+    partes = re.split(r"\s*(?:,|;|\s/\s?|/\s|\s[xX]\s(?![&,;/])|\svs\.?\s|-\s)\s*", a)
     partes = [q for p in partes for q in _pegados(p.strip(" -"), conocidos)]
     vistos, out = set(), []
     for p in partes:
@@ -125,7 +129,7 @@ def prolijo(artista, titulo, conocidos=None):
     t = re.sub(r"\(\s*\)", "", t)
     if t.count("(") > t.count(")"):
         t += ")"
-    t = _espacios(t)
+    t = _espacios(t) or _espacios(titulo)       # un título que es todo «ruido» («4K», «HD») se deja como vino
     principales = separar_artistas(a, conocidos)
     claves = {x.lower() for x in principales}
     invitados = [x for x in dict.fromkeys(invitados) if x.lower() not in claves]
@@ -150,7 +154,7 @@ def nombre_archivo(artista, titulo, ext, largo=140, conocidos=None):
     n = n.replace("/", "-").replace("\\", "-").replace(":", " -")
     n = re.sub(r'[*?"<>|]', "", n) if not n.startswith("*") else "*" + re.sub(r'[*?"<>|]', "", n[1:])
     n = re.sub(r"\s+", " ", n).strip(" .")
-    n = re.sub(r"\.(\s*-)", r".\1", n)
+    n = re.sub(r"\.(\s*-)", r".\1", n) or "Sin nombre"
     if len(n) > largo:                                   # cortar en una palabra, nunca a la mitad
         n = n[:largo].rsplit(" ", 1)[0].rstrip(" -(,&")
     return n + ext.lower()

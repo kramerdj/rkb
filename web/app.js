@@ -779,7 +779,18 @@ async function correrMyTags(simular) {
   }
 }
 $('#mtSimular').onclick = () => correrMyTags(true);
-$('#mtAplicar').onclick = () => correrMyTags(false);
+$('#mtAplicar').onclick = async () => {
+  let resumen;
+  try { resumen = (await api('/api/mytags', { simular: true })).resumen; } catch (e) { aviso(e.message, true); return; }
+  const propios = resumen.filter((c) => c.seQuitan && c.seQuitan.temas);
+  if (!propios.length) { correrMyTags(false); return; }
+  modal('Vas a reemplazar My Tags que ya tenías', `<p>Estas categorías pasan a armarse solas, y los tags que tenías ahí se sacan de Rekordbox:</p>
+    <ul>${propios.map((c) => `<li><b>${esc(c.nombre)}</b>: ${esc(c.seQuitan.tags.slice(0, 8).join(', '))}${c.seQuitan.tags.length > 8 ? '…' : ''} (en ${c.seQuitan.temas} temas)</li>`).join('')}</ul>
+    <p class="nota">Si querés conservarlos, cancelá y poné esa categoría en «Manual» acá arriba. Antes de cambiar nada se hace un backup y se puede deshacer desde Ajustes.</p>`, [
+    { txt: 'Cancelar' },
+    { txt: 'Reemplazar y actualizar', prim: true, fn: async () => { cerrarModal(); await correrMyTags(false); } },
+  ]);
+};
 
 // ---------------------------------------------------------------- AJUSTES
 const CARPETAS = [['coleccion', 'Colección', 'Donde viven los temas que usa Rekordbox.'],
@@ -825,7 +836,7 @@ for (const id of ['inicio', 'lastfm', 'discogs', 'spotify_id', 'spotify_secret',
 async function pintarHistorial() {
   const { historial } = await api('/api/historial');
   const vigente = historial.find((h) => !h.deshecho);
-  $('#historial').innerHTML = historial.length ? historial.map((h) => `<div class="hist${h.deshecho ? ' deshecho' : ''}"><div><b>${esc(h.que)}</b><small>${new Date(h.cuando).toLocaleString('es-AR', { dateStyle: 'short', timeStyle: 'short' })} · ${esc(h.detalle)}${h.archivos ? ` · ${h.archivos} archivos respaldados` : ''}${h.deshecho ? ' · deshecho' : ''}</small></div>${!h.deshecho && vigente && vigente.id === h.id ? `<button type="button" class="btn chico" data-deshacer="${h.id}">Deshacer</button>` : ''}</div>`).join('')
+  $('#historial').innerHTML = historial.length ? historial.map((h) => `<div class="hist${h.deshecho ? ' deshecho' : ''}"><div><b>${esc(h.que)}</b><small>${new Date(h.cuando).toLocaleString('es-AR', { dateStyle: 'short', timeStyle: 'short' })} · ${esc(h.detalle)}${h.archivos ? ` · ${esc(h.archivos)} archivos respaldados` : ''}${h.deshecho ? ' · deshecho' : ''}</small></div>${!h.deshecho && vigente && vigente.id === h.id ? `<button type="button" class="btn chico" data-deshacer="${esc(h.id)}">Deshacer</button>` : ''}</div>`).join('')
     : '<p class="nota">Todavía no hay operaciones.</p>';
 }
 $('#historial').addEventListener('click', (e) => {

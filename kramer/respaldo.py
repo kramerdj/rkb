@@ -7,6 +7,7 @@ Estructura en la carpeta de destino (idealmente un disco externo):
     Colección/indice.json                             de dónde vino cada archivo
     Colección/_quitados/AAAA-MM-DD/...                lo que ya no está en la colección (nunca se borra solo)
 """
+import gc
 import datetime
 import json
 import os
@@ -105,6 +106,11 @@ def _validar_destino(dest):
 
 
 # ---------------------------------------------------------------- estado
+def _entero(v):
+    """Un dato del manifiesto de un zip (que puede venir de otra computadora) sólo vale si es un número."""
+    return v if type(v) is int else None
+
+
 def estado():
     dest = destino()
     c = config.cargar()
@@ -119,7 +125,7 @@ def estado():
             man = {"error": "no se pudo leer"}
         bases.append({"ruta": str(z), "nombre": z.name, "bytes": z.stat().st_size,
                       "fecha": man.get("fecha") or datetime.datetime.fromtimestamp(z.stat().st_mtime).isoformat(timespec="minutes"),
-                      "share": bool(man.get("share")), "temas": man.get("temas"), "playlists": man.get("playlists"),
+                      "share": bool(man.get("share")), "temas": _entero(man.get("temas")), "playlists": _entero(man.get("playlists")),
                       "sistema": man.get("sistema", ""), "motivo": man.get("motivo", ""), "valido": "error" not in man})
     ind = _leer_json(dest / DIR_COL / "indice.json")
     col = None
@@ -393,19 +399,23 @@ def restaurar_base(t, ruta, con_share=True):
                  and (n in ARCHIVOS_BASE or (incluye_share and n.startswith("share/")))]
     t.total += len(a_extraer)
     with zipfile.ZipFile(ruta) as zf:
-        for n in ("master.db-wal", "master.db-shm"):   # si el backup no los trae, los actuales no sirven
-            if n not in nombres and (rb_dir / n).exists():
-                (rb_dir / n).unlink()
         for i, n in enumerate(a_extraer):
             destino_f = rb_dir / n
             destino_f.parent.mkdir(parents=True, exist_ok=True)
             tmp = destino_f.with_name(destino_f.name + ".restaurando")
             with zf.open(n) as src, open(tmp, "wb") as dst:
                 shutil.copyfileobj(src, dst, 1024 * 1024)
-            os.replace(tmp, destino_f)
+            try:
+                os.replace(tmp, destino_f)
+            except PermissionError:
+                gc.collect()            # Windows: una conexión a la base que quedó sin cerrar la mantiene tomada
+                os.replace(tmp, destino_f)
             t.hechos += 1
             if i % 25 == 0 or i == len(a_extraer) - 1:
                 t.mensaje = f"Restaurando la base: {i + 1} de {len(a_extraer)} archivos"
+    for n in ("master.db-wal", "master.db-shm"):       # con la base ya restaurada: si el backup no los trae,
+        if n not in nombres and (rb_dir / n).exists():  # los que quedaron son de la base anterior y no sirven
+            (rb_dir / n).unlink()
     return {"restaurados": len(a_extraer), "previo": previo["zip"] if previo else None,
             "fecha": man.get("fecha"), "share": incluye_share,
             "otroSistema": bool(man.get("sistema")) and man.get("sistema") != ("windows" if plataforma.ES_WIN else "mac")}

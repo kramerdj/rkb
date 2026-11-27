@@ -45,7 +45,7 @@ control/versiones.json   última versión y versión mínima obligatoria (la lee
 ## Reglas que no se rompen
 
 1. **La base de Rekordbox es sagrada.** Toda escritura va dentro de `historial.Operacion` (backup previo + registro para deshacer) y sólo con Rekordbox cerrado (`requiere_cerrado()` / `rb.rekordbox_abierto()`).
-2. **My Tags:** en la config las categorías son lugares "1".."4" (1ª..4ª columna de Rekordbox), no ID de la base. Pasar siempre por `rb.ids_categorias(db)`: en algunas bases (Windows) las categorías no tienen los ID 1 a 4. Las categorías automáticas no muestran tags sin temas (los de fábrica de Rekordbox).
+2. **My Tags:** en la config las categorías son lugares "1".."4" (1ª..4ª columna de Rekordbox), no ID de la base. Pasar siempre por `rb.ids_categorias(db)`: en algunas bases (Windows) las categorías no tienen los ID 1 a 4. Las categorías automáticas no muestran tags sin temas (los de fábrica de Rekordbox). Una categoría automática se llena sola recién cuando en Rekordbox ya lleva el nombre de la app (después de «Actualizar base de Rekordbox» en el paso 4): antes puede tener tags propios del usuario, y el paso 4 avisa cuáles se reemplazan.
 3. **Rutas:** comparar siempre normalizadas (NFC + casefold, `rb._clave_path`). macOS mezcla NFC/NFD y no distingue mayúsculas. En Windows Rekordbox guarda rutas con `/`.
 4. **Nunca borrar archivos del usuario.** Se mueven a carpetas de backup; el backup de la colección aparta en `_quitados`, no borra.
 5. **macOS:** sin «Acceso total al disco» falla con PermissionError → el servidor lo traduce a un mensaje con la solución. Las escrituras de historial son *create-only* (archivo nuevo por operación) por eso.
@@ -54,10 +54,11 @@ control/versiones.json   última versión y versión mínima obligatoria (la lee
 8. **Seguridad de la nube:** la app sólo lleva la *anon key*. Todos los permisos están en `supabase.sql` (RLS + triggers): un usuario común no puede publicar, destacar, marcar pagado ni hacerse admin. Cualquier cambio de permisos va en `supabase.sql` y se prueba contra Postgres.
 9. **Licencia GPL-3.0-or-later** (por mutagen). La app lleva su código fuente adentro (`codigo-fuente.zip`). Mantener créditos en Acerca de.
 10. Errores para el usuario: en castellano, qué pasó y qué hacer. Nunca un traceback crudo en pantalla.
+11. **Servidor local:** sólo atiende a la página de la app (`Handler._de_la_app`: Host local, Origin propio y POST en JSON). Toda ruta de archivo que llegue en un pedido se revisa contra las carpetas de la app o la lista de preparados antes de usarla. La interfaz escapa con `esc()` todo lo que no sea texto fijo.
 
 ## Cómo probar
 
-- Pruebas: `python -m unittest discover -s tests -v` (crean todo en carpetas temporales con `KRAMER_APP_DIR`).
+- Pruebas: `python -m unittest discover -s tests -v` (crean todo en carpetas temporales con `KRAMER_APP_DIR`). Corren en Mac, Windows y Linux en cada cambio. `tests/base_rb.py` arma una base de Rekordbox de prueba con las tablas reales; `tests/test_defectos.py` reúne las pruebas que salieron de la revisión de noviembre de 2026: las marcadas `expectedFailure` son defectos sin arreglar (al arreglar uno, sacarle la marca).
 - App sin tocar datos reales: `KRAMER_APP_DIR=/tmp/x python kramer_app.py` y en Ajustes apuntar a una **copia** de `master.db`.
 - La interfaz se probó con Playwright (Chromium) contra el servidor local.
 - Colecciones grandes: la tabla de Colección está virtualizada (sólo dibuja lo visible); con 30.000 temas debe seguir fluida.

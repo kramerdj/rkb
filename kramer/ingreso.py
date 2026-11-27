@@ -71,7 +71,7 @@ def listar(carpeta=None):
         return out
     for root, dirs, files in os.walk(carpeta):
         dirs[:] = [d for d in dirs if not d.startswith(".") and d != DESCARTADOS
-                   and not _clave_path(Path(root) / d).startswith(coleccion)]
+                   and not (_clave_path(Path(root) / d) + os.sep).startswith(coleccion + os.sep)]
         for f in files:
             if not f.startswith(".") and Path(f).suffix.lower() in EXT:
                 out.append(str(Path(root) / f))
@@ -207,7 +207,8 @@ def aplicar_metadata(items, op, log):
             cambios = {k: m[k] for k in ("titulo", "artista", "album", "anio", "genero", "grouping") if k in m}
             if "pais" in m or "idioma" in m:
                 previo = archivos.leer(ruta).get("comentario", "")
-                cambios["comentario"] = archivos.armar_comentario(previo, m.get("pais", ""), m.get("idioma", ""))
+                pais, idioma = archivos.pais_idioma(previo)
+                cambios["comentario"] = archivos.armar_comentario(previo, m.get("pais", pais), m.get("idioma", idioma))
             archivos.escribir(ruta, cambios)
             if it.get("caratulaNueva") and Path(it["caratulaNueva"]).is_file():
                 oc.escribir_tags(ruta, {}, Path(it["caratulaNueva"]).read_bytes())

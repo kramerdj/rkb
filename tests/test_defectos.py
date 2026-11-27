@@ -1,8 +1,9 @@
-"""Defectos encontrados en la revisión de noviembre de 2026, todavía sin arreglar.
+"""Pruebas que nacieron de la revisión de noviembre de 2026: cada una cuida un defecto que se encontró ahí.
 
-Cada prueba describe lo que TENDRÍA que pasar y está marcada como «falla esperada». Cuando se arregle el defecto,
-la prueba empieza a pasar, la corrida avisa «unexpected success» y hay que sacarle la marca: desde ahí cuida el arreglo.
+Las que siguen marcadas como «falla esperada» son defectos todavía sin arreglar: describen lo que TENDRÍA que pasar.
+Cuando se arregle uno, su prueba avisa «unexpected success» y hay que sacarle la marca.
 """
+import datetime
 import json
 import os
 import threading
@@ -30,10 +31,7 @@ class Deshacer(unittest.TestCase):
         (self.rb / "master.db").write_bytes(b"base antes de la operacion")
         config.guardar({"rekordbox": str(self.rb), "backup": str(self.d / "backup")})
 
-    @unittest.expectedFailure
     def test_guarda_lo_que_pisa(self):
-        """Deshacer copia la base vieja arriba de la actual sin guardar la actual: lo que se hizo en Rekordbox
-        después de la operación (cues, playlists, temas nuevos) se pierde sin vuelta."""
         with historial.Operacion("Sincronizar") as op:
             (self.rb / "master.db").write_bytes(b"base despues de la operacion")
         (self.rb / "master.db").write_bytes(b"una semana de trabajo en Rekordbox")
@@ -41,9 +39,7 @@ class Deshacer(unittest.TestCase):
         copias = [p for p in self.d.rglob("*") if p.is_file() and p.read_bytes() == b"una semana de trabajo en Rekordbox"]
         self.assertTrue(copias, "no quedó ninguna copia de la base que se pisó")
 
-    @unittest.expectedFailure
     def test_backup_incompleto_no_se_da_por_deshecho(self):
-        """Si al backup de la operación le falta master.db, Deshacer no devuelve nada pero igual dice «Deshecho»."""
         with historial.Operacion("Sincronizar") as op:
             (self.rb / "master.db").write_bytes(b"base despues de la operacion")
         (op.carpeta / "base" / "master.db").unlink()
@@ -52,10 +48,7 @@ class Deshacer(unittest.TestCase):
 
 
 class LimpiezaDeBackups(unittest.TestCase):
-    @unittest.expectedFailure
     def test_solo_ofrece_borrar_backups_de_operaciones(self):
-        """La pantalla para liberar espacio lista (y deja borrar para siempre) todo lo que haya en la carpeta de backups:
-        también el backup completo «Respaldos RKB» y cualquier otra carpeta que el usuario tenga ahí."""
         raiz = entorno.carpeta() / "backup"
         (raiz / "Respaldos RKB" / "base").mkdir(parents=True)
         (raiz / "Contratos").mkdir()
@@ -65,10 +58,7 @@ class LimpiezaDeBackups(unittest.TestCase):
 
 
 class BackupCompleto(unittest.TestCase):
-    @unittest.expectedFailure
     def test_datos_del_manifiesto_llegan_como_numeros(self):
-        """La pantalla de backups muestra «temas» y «playlists» tal como vienen dentro del zip, sin revisarlos:
-        un zip armado a propósito puede meter código en la página. Tienen que llegar como números o vacíos."""
         d = entorno.carpeta()
         config.guardar({"respaldo_destino": str(d), "coleccion": str(d / "coleccion")})
         carpeta = respaldo.destino() / respaldo.DIR_BASE
@@ -80,11 +70,7 @@ class BackupCompleto(unittest.TestCase):
         self.assertIsInstance(base["temas"], (int, type(None)))
         self.assertIsInstance(base["playlists"], (int, type(None)))
 
-    @unittest.skipUnless(os.name == "nt", "sólo pasa en Windows")
-    @unittest.expectedFailure
-    def test_restaurar_la_base_en_windows(self):
-        """En Windows, restaurar la base falla con «Acceso denegado»: la app deja master.db abierto después de leerlo
-        y Windows no permite reemplazar un archivo abierto. Antes de fallar ya borró master.db-wal."""
+    def test_restaurar_la_base_que_la_app_acaba_de_leer(self):
         d = entorno.carpeta()
         (d / "rb").mkdir()
         (d / "rb" / "master.db").write_bytes(b"base original")
@@ -102,10 +88,7 @@ class BackupCompleto(unittest.TestCase):
 
 
 class CambiosPendientes(unittest.TestCase):
-    @unittest.expectedFailure
     def test_no_se_pierden_cuando_llegan_juntos(self):
-        """Cada Momento que se marca se guarda leyendo y reescribiendo pendientes.json sin turno: si llegan varios
-        a la vez (tecla apretada, dos pedidos seguidos) algunos se pisan y se pierden sin aviso."""
         config.guardar_pendientes({"momento": {}, "meta": {}, "tags": {}})
         hilos = [threading.Thread(target=servidor.api_pendiente, args=({"id": str(n), "momento": "Peak"},)) for n in range(150)]
         for h in hilos:
@@ -121,19 +104,13 @@ class VersionObligatoria(unittest.TestCase):
         nube._control, nube.CONTROL_URL = (lambda forzar: d), "https://ejemplo"
         self.addCleanup(lambda: (setattr(nube, "_control", viejos[0]), setattr(nube, "CONTROL_URL", viejos[1])))
 
-    @unittest.expectedFailure
     def test_cero_de_mas_no_bloquea_a_quien_esta_al_dia(self):
-        """«0.9.1.0» se toma como más nueva que «0.9.1»: si alguien escribe la mínima con un cero de más,
-        quedan bloqueados los que ya tienen la última versión."""
         self.control({"ultima": "0.9.1", "minima": "0.9.1.0", "gracia_dias": 0, "minima_desde": "2026-01-01"})
         self.assertFalse(nube.novedades("0.9.1")["bloqueo"])
 
 
 class SesionDeMisAnuncios(unittest.TestCase):
-    @unittest.expectedFailure
     def test_sin_internet_no_cierra_la_sesion(self):
-        """Si falla la renovación de la sesión por cualquier motivo (también sin internet o con el servidor caído),
-        la app borra la sesión y obliga a pedir otro código por email."""
         sesion = {"access": "a", "refresh": "r", "vence": time.time() - 10, "uid": "u1", "email": "dj@ejemplo.com"}
         config.guardar({"nube_sesion": sesion})
         self.addCleanup(config.guardar, {"nube_sesion": None})
@@ -145,10 +122,7 @@ class SesionDeMisAnuncios(unittest.TestCase):
 
 
 class BaseDeRekordbox(unittest.TestCase):
-    @unittest.expectedFailure
     def test_abre_siempre_la_base_configurada(self):
-        """Cuando la base está en la carpeta de siempre, la app deja que pyrekordbox elija cuál abrir. Si en Rekordbox
-        se mudó la biblioteca a otro disco, se escribe en una base y el backup y el Deshacer trabajan sobre otra."""
         d = entorno.carpeta()
         (d / "master.db").write_bytes(b"x")
         config.guardar({"rekordbox": str(d)})
@@ -158,10 +132,7 @@ class BaseDeRekordbox(unittest.TestCase):
             rb.abrir()
         self.assertEqual(abrir.call_args.kwargs.get("path"), str(d / "master.db"))
 
-    @unittest.expectedFailure
     def test_rutas_de_windows_con_cualquier_barra(self):
-        """Rekordbox guarda las rutas con «/» y Windows las arma con «\\»: la app las compara como si fueran distintas,
-        así que en Windows no reconoce que dos temas usan el mismo archivo."""
         self.assertEqual(rb._clave_path("C:/Musica/Tema.mp3"), rb._clave_path("C:\\Musica\\Tema.mp3"))
 
     @unittest.expectedFailure
@@ -177,43 +148,43 @@ class BaseDeRekordbox(unittest.TestCase):
             finally:
                 db.close()
 
-    @unittest.expectedFailure
-    def test_dos_tags_con_el_mismo_nombre_no_rompen_el_guardado(self):
-        """Si en una categoría hay dos tags con el mismo nombre (se puede llegar renombrando uno), guardar un Momento
-        con ese nombre falla con un error interno y los cambios quedan trabados."""
+    def test_no_deja_dos_tags_con_el_mismo_nombre(self):
+        base_rb.crear()
+        rb.editar_mytags([{"cat": "4", "accion": "agregar", "nombre": "Peak"}, {"cat": "4", "accion": "agregar", "nombre": "Main"}])
+        tags = {t["nombre"]: t["id"] for t in rb.listar_mytags()[3]["tags"]}
+        with self.assertRaises(ValueError):
+            rb.editar_mytags([{"cat": "4", "accion": "renombrar", "id": tags["Main"], "nombre": "Peak"}])
+        self.assertEqual(set(t["nombre"] for t in rb.listar_mytags()[3]["tags"]), {"Peak", "Main"})
+
+    def test_tags_repetidos_que_ya_estaban_no_rompen_el_guardado(self):
         d = base_rb.crear()
         cid = base_rb.agregar_tema(base_rb.audio(d / "coleccion" / "tema.mp3"), "Tema", "Artista")
         rb.editar_mytags([{"cat": "4", "accion": "agregar", "nombre": "Peak"}, {"cat": "4", "accion": "agregar", "nombre": "Main"}])
-        tags = {t["nombre"]: t["id"] for t in rb.listar_mytags()[3]["tags"]}
-        rb.editar_mytags([{"cat": "4", "accion": "renombrar", "id": tags["Main"], "nombre": "Peak"}])
+        with rb.lock:
+            db = rb.abrir()
+            try:
+                db.query(m.DjmdMyTag).filter(m.DjmdMyTag.Name == "Main").one().Name = "Peak"
+                db.commit()
+            finally:
+                db.close()
         with historial.Operacion("Sincronizar") as op:
             rb.aplicar({"meta": {}, "momento": {cid: "Peak"}, "tags": {}}, op.respaldar_archivo, lambda s: None)
+        self.assertEqual(rb.leer_coleccion()["temas"][0]["momento"], "Peak")
 
 
 class NombresProlijos(unittest.TestCase):
-    @unittest.expectedFailure
     def test_titulos_que_empiezan_con_un_numero(self):
-        """Al limpiar el título se saca el «número de pista» del principio aunque sea parte del nombre:
-        «7 rings» queda «Rings» y «99 Problems» queda «Problems», en la etiqueta y en el nombre del archivo."""
         self.assertEqual(nombres.prolijo("Ariana Grande", "7 rings")[1], "7 Rings")
         self.assertEqual(nombres.prolijo("Jay-Z", "99 Problems")[1], "99 Problems")
 
-    @unittest.expectedFailure
     def test_el_titulo_nunca_queda_vacio(self):
-        """Un tema que se llama «4K» o «HD» queda sin título (se toma por ruido), y sin artista el archivo
-        pasa a llamarse «.mp3», que en Mac es un archivo oculto."""
         self.assertEqual(nombres.prolijo("El Alfa", "4K")[1], "4K")
         self.assertNotEqual(nombres.nombre_archivo("", "HD", ".mp3"), ".mp3")
 
-    @unittest.expectedFailure
     def test_clean_y_explicit_son_versiones_distintas(self):
-        """«(Clean)» y «(Explicit)» se sacan como ruido: las dos versiones quedan con el mismo título
-        y el paso 2 marca la segunda como duplicado para eliminar."""
         self.assertNotEqual(nombres.prolijo("Cardi B", "WAP (Clean)"), nombres.prolijo("Cardi B", "WAP (Explicit)"))
 
-    @unittest.expectedFailure
     def test_artistas_con_x_o_con_coma_en_el_nombre(self):
-        """«Lil Nas X & Jack Harlow» queda «Lil Nas & & Jack Harlow» y «Tyler, The Creator» queda «Tyler & The Creator»."""
         self.assertEqual(nombres.prolijo("Lil Nas X & Jack Harlow", "Industry Baby")[0], "Lil Nas X & Jack Harlow")
         self.assertEqual(nombres.prolijo("Tyler, The Creator", "Earfquake")[0], "Tyler, The Creator")
 
@@ -222,10 +193,7 @@ class Descargas(unittest.TestCase):
     def setUp(self):
         self.d = base_rb.crear()
 
-    @unittest.expectedFailure
     def test_cambiar_el_pais_no_borra_el_idioma(self):
-        """En el paso 2, si se guarda sólo el país, el idioma que ya tenía el comentario se borra
-        (y con él los My Tags automáticos de idioma)."""
         ruta = base_rb.audio(self.d / "descargas" / "tema.mp3")
         archivos.escribir(ruta, {"titulo": "Tema", "artista": "Artista", "comentario": "País: Argentina | Idioma: Español"})
         with historial.Operacion("Preparar descargas", con_base=False) as op:
@@ -233,18 +201,13 @@ class Descargas(unittest.TestCase):
         comentarios = [archivos.leer(p)["comentario"] for p in (self.d / "descargas").glob("*.mp3")]
         self.assertEqual(comentarios, ["País: Uruguay | Idioma: Español"])
 
-    @unittest.expectedFailure
     def test_ve_las_subcarpetas_aunque_el_nombre_empiece_igual_que_la_coleccion(self):
-        """Si la carpeta de descargas se llama como la colección más algo («Musica» y «Musica nueva»),
-        la app saltea todas sus subcarpetas sin avisar."""
         descargas = self.d / "coleccion nueva"
         base_rb.audio(descargas / "pack" / "adentro.mp3")
         config.guardar({"incorporar": str(descargas)})
-        self.assertEqual([Path(x["ruta"]).name for x in ingreso.listar()], ["adentro.mp3"])
+        self.assertEqual([Path(x).name for x in ingreso.listar()], ["adentro.mp3"])
 
-    @unittest.expectedFailure
     def test_incorporar_solo_acepta_archivos_de_descargas(self):
-        """El paso 3 mueve a la colección cualquier archivo cuya ruta le llegue, esté donde esté en el disco."""
         ajeno = base_rb.audio(self.d / "otra carpeta" / "ajeno.mp3")
         with mock.patch.object(rb, "rekordbox_abierto", return_value=False):
             with self.assertRaises(servidor.Error):
@@ -260,10 +223,7 @@ class ServidorLocal(unittest.TestCase):
         cls.addClassCleanup(cls.srv.server_close)
         cls.addClassCleanup(cls.srv.shutdown)
 
-    @unittest.expectedFailure
     def test_no_acepta_pedidos_de_otra_pagina(self):
-        """El servidor de la app no mira de dónde viene cada pedido: una página cualquiera abierta en el navegador
-        de la misma computadora puede mandarle órdenes. Un pedido que declara otro origen tiene que ser rechazado."""
         pedido = urllib.request.Request(f"http://127.0.0.1:{self.srv.server_address[1]}/api/pendiente",
                                         data=json.dumps({"id": "1", "momento": "Peak"}).encode(),
                                         headers={"Origin": "https://ejemplo.com", "Content-Type": "text/plain"})
@@ -271,10 +231,7 @@ class ServidorLocal(unittest.TestCase):
             urllib.request.urlopen(pedido, timeout=10).close()
         self.assertEqual(error.exception.code, 403)
 
-    @unittest.expectedFailure
     def test_ajustes_no_acepta_cualquier_valor(self):
-        """Ajustes guarda lo que le llegue, del tipo que sea: un valor mal formado deja la app sin poder abrir
-        hasta editar config.json a mano, y las carpetas no se revisan."""
         self.addCleanup(config.guardar, {"respaldo_destino": ""})
         with self.assertRaises(servidor.Error):
             servidor.api_config({"respaldo_destino": 5})
@@ -286,6 +243,140 @@ class ServidorLocal(unittest.TestCase):
         config.guardar({"lastfm": "clave-secreta-de-prueba"})
         self.addCleanup(config.guardar, {"lastfm": ""})
         self.assertNotIn("clave-secreta-de-prueba", json.dumps(servidor.api_estado({})))
+
+    def pedir(self, cuerpo, **cabeceras):
+        puerto = self.srv.server_address[1]
+        pedido = urllib.request.Request(f"http://127.0.0.1:{puerto}/api/pendiente", data=json.dumps(cuerpo).encode(),
+                                        headers={"Content-Type": "application/json", **cabeceras})
+        try:
+            with urllib.request.urlopen(pedido, timeout=10) as r:
+                return r.status
+        except urllib.error.HTTPError as e:
+            return e.code
+
+    def test_acepta_los_pedidos_de_su_propia_pagina(self):
+        puerto = self.srv.server_address[1]
+        self.assertEqual(self.pedir({"id": "1", "momento": "Peak"}), 200)
+        self.assertEqual(self.pedir({"id": "1", "momento": "Peak"}, Origin=f"http://127.0.0.1:{puerto}"), 200)
+        self.assertEqual(self.pedir({"id": "1", "momento": "Peak"}, Origin=f"http://localhost:{puerto}", Host=f"localhost:{puerto}"), 200)
+
+    def test_rechaza_otro_host_y_otro_tipo_de_contenido(self):
+        self.assertEqual(self.pedir({"id": "1"}, Host="sitio-ajeno.example:80"), 403)
+        self.assertEqual(self.pedir({"id": "1"}, **{"Content-Type": "text/plain"}), 403)
+        self.assertEqual(self.pedir({"id": "1"}, Origin="null"), 403)
+        pagina = urllib.request.Request(f"http://127.0.0.1:{self.srv.server_address[1]}/api/estado", headers={"Host": "sitio-ajeno.example"})
+        with self.assertRaises(urllib.error.HTTPError) as error:
+            urllib.request.urlopen(pagina, timeout=10).close()
+        self.assertEqual(error.exception.code, 403)
+
+    def test_ajustes_validos_se_guardan(self):
+        d = entorno.carpeta()
+        antes = config.cargar()
+        self.addCleanup(config.guardar, {k: antes[k] for k in ("incorporar", "teclas", "inicio_seg", "cartelera_inicio", "ubicacion")})
+        c = servidor.api_config({"incorporar": str(d), "teclas": ["Main"], "inicio_seg": 45, "cartelera_inicio": False,
+                                 "ubicacion": {"pais": "AR", "region": "Córdoba"}, "respaldo_destino": ""})["config"]
+        self.assertEqual((c["incorporar"], c["teclas"], c["inicio_seg"], c["cartelera_inicio"]), (str(d), ["Main"], 45, False))
+        for malo in ({"coleccion": "carpeta/relativa"}, {"teclas": "Main"}, {"cartelera_inicio": "si"}, {"inicio_seg": "45"}, {"lastfm": 5}):
+            with self.assertRaises(servidor.Error, msg=malo):
+                servidor.api_config(malo)
+
+    def test_abrir_solo_dentro_de_las_carpetas_de_la_app(self):
+        d = entorno.carpeta()
+        antes = config.cargar()["incorporar"]
+        self.addCleanup(config.guardar, {"incorporar": antes})
+        config.guardar({"incorporar": str(d / "descargas")})
+        (d / "descargas").mkdir()
+        (d / "descargas" / "lista_depurada.txt").write_text("x")
+        (d / "descargas" / "programa.command").write_text("x")
+        (d / "afuera.txt").write_text("x")
+        with mock.patch.object(plataforma, "abrir") as abrir, mock.patch.object(plataforma, "mostrar") as mostrar:
+            servidor.api_abrir({"ruta": str(d / "descargas" / "lista_depurada.txt")})
+            servidor.api_abrir({"ruta": str(d / "descargas" / "programa.command"), "mostrar": True})
+            for ajeno in (str(d / "afuera.txt"), str(d / "descargas" / "programa.command"), str(d / "descargas" / ".." / "afuera.txt"), ""):
+                with self.assertRaises(servidor.Error, msg=ajeno):
+                    servidor.api_abrir({"ruta": ajeno})
+        self.assertEqual((abrir.call_count, mostrar.call_count), (1, 1))
+
+    def test_el_titulo_del_selector_de_carpetas_no_se_mezcla_con_el_script(self):
+        titulo = 'Elegí" & (do shell script "x") & "'
+        with mock.patch.object(plataforma, "ES_MAC", True), mock.patch.object(plataforma.subprocess, "run") as correr:
+            correr.return_value.stdout = "/Users/dj/Music/\n"
+            self.assertEqual(plataforma.elegir_carpeta(titulo), "/Users/dj/Music")
+        orden = correr.call_args.args[0]
+        self.assertEqual((orden[0], orden[-1]), ("osascript", titulo))
+        self.assertNotIn("do shell script", orden[2])
+
+
+class MyTagsQueYaTenia(unittest.TestCase):
+    """Un DJ que ya usaba My Tags en Rekordbox no los pierde por guardar un cambio: recién se reemplazan en el paso 4."""
+
+    def setUp(self):
+        self.d = base_rb.crear(paso_4=False)
+        self.cid = base_rb.agregar_tema(base_rb.audio(self.d / "coleccion" / "tema.mp3"), "Tema", "Artista", anio=1995)
+        ahora = datetime.datetime.now()
+        with rb.lock:
+            db = rb.abrir()
+            try:
+                db.add(m.DjmdMyTag(ID="50", Seq=1, Name="House", Attribute=0, ParentID="1", UUID="u-50", created_at=ahora, updated_at=ahora))
+                db.add(m.DjmdSongMyTag(ID="60", MyTagID="50", ContentID=self.cid, UUID="u-60", created_at=ahora, updated_at=ahora))
+                db.commit()
+            finally:
+                db.close()
+
+    def tags(self):
+        with rb.lock:
+            db = rb.abrir()
+            try:
+                nombres = {t.ID: t.Name for t in db.query(m.DjmdMyTag)}
+                return sorted(nombres[a.MyTagID] for a in db.query(m.DjmdSongMyTag).filter(m.DjmdSongMyTag.ContentID == self.cid))
+            finally:
+                db.close()
+
+    def test_guardar_un_cambio_no_toca_sus_tags(self):
+        with historial.Operacion("Sincronizar") as op:
+            rb.aplicar({"meta": {self.cid: {"titulo": "Otro", "pais": "Argentina"}}, "momento": {}, "tags": {}}, op.respaldar_archivo, lambda s: None)
+        self.assertEqual(self.tags(), ["House"])
+
+    def test_la_simulacion_avisa_que_se_van_a_reemplazar(self):
+        resumen = {c["id"]: c for c in rb.sincronizar_categorias(simular=True, leer_archivos=False)}
+        self.assertEqual(resumen["1"]["seQuitan"], {"temas": 1, "tags": ["House"]})
+        self.assertEqual(resumen["3"]["seQuitan"], {"temas": 0, "tags": []})
+        self.assertEqual(self.tags(), ["House"])
+
+    def test_despues_del_paso_4_los_arma_la_app(self):
+        rb.sincronizar_categorias(simular=False, leer_archivos=False)
+        self.assertEqual(self.tags(), ["90s"])
+        with historial.Operacion("Sincronizar") as op:
+            rb.aplicar({"meta": {self.cid: {"anio": "2001"}}, "momento": {}, "tags": {}}, op.respaldar_archivo, lambda s: None)
+        self.assertEqual(self.tags(), ["2000s"])
+
+
+class LimpiezaDeBackupsBorrar(unittest.TestCase):
+    def test_borra_backups_de_operaciones_y_nada_mas(self):
+        d = entorno.carpeta()
+        (d / "rb").mkdir()
+        (d / "rb" / "master.db").write_bytes(b"x")
+        config.guardar({"rekordbox": str(d / "rb"), "backup": str(d / "backup"), "respaldo_destino": ""})
+        with historial.Operacion("Sincronizar") as op:
+            pass
+        completo = d / "backup" / "Respaldos RKB"
+        completo.mkdir()
+        viejo = d / "backup" / "_BACKUP originales"
+        viejo.mkdir()
+        self.assertEqual({Path(i["ruta"]).name for i in backups.listar()["items"]}, {op.carpeta.name, "_BACKUP originales"})
+        r = backups.borrar([str(completo), str(d / "rb"), str(op.carpeta)])
+        self.assertEqual(len(r["errores"]), 2)
+        self.assertTrue(completo.is_dir() and (d / "rb" / "master.db").is_file())
+        self.assertFalse(op.carpeta.exists())
+
+
+class NombresEnRekordbox(unittest.TestCase):
+    def test_renombrar_guarda_la_ruta_con_las_barras_de_rekordbox(self):
+        d = base_rb.crear()
+        cid = base_rb.agregar_tema(base_rb.audio(d / "coleccion" / "viejo.mp3"), "Tema", "Artista")
+        with historial.Operacion("Ordenar nombres") as op:
+            rb.renombrar([{"id": cid, "nuevo": "Artista - Tema.mp3"}], op, lambda s: None)
+        self.assertNotIn("\\", base_rb.tema(cid)["ruta"])
 
 
 if __name__ == "__main__":
