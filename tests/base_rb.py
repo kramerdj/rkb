@@ -2,6 +2,7 @@
 import datetime
 import os
 import subprocess
+from pathlib import Path
 from uuid import uuid4
 
 import entorno
@@ -53,6 +54,11 @@ def crear(ids_categorias=("1", "2", "3", "4")):
     (carpeta / "coleccion").mkdir()
     (carpeta / "descargas").mkdir()
     return carpeta
+
+
+def misma_ruta(a, b):
+    """Compara dos rutas como lo hace la app, sin importar si vienen con barras de Windows o de Rekordbox."""
+    return rb.mismo_path(Path(a).as_posix(), Path(b).as_posix())
 
 
 def agregar_tema(ruta, titulo, artista="", genero="", anio=None, comentario=None):
