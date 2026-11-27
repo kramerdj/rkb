@@ -142,10 +142,7 @@ class Historial(unittest.TestCase):
                 1 / 0
         self.assertEqual(historial.listar(), [])
 
-    @unittest.expectedFailure
     def test_dos_operaciones_en_el_mismo_segundo_no_se_pisan(self):
-        """Hoy la carpeta del backup se llama por fecha y hora al segundo: dos operaciones seguidas comparten carpeta
-        y la segunda pisa el backup de la primera (ver la revisión, «Historial»)."""
         primera = self.operacion("Primera")
         segunda = historial.Operacion("Segunda")
         segunda.ts, segunda.carpeta = primera.ts, primera.carpeta

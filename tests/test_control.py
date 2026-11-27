@@ -66,10 +66,7 @@ class Herramienta(unittest.TestCase):
                 self.correr(*args)
             self.assertEqual(self.archivo.read_text(), antes, args)
 
-    @unittest.expectedFailure
     def test_no_deja_obligar_una_version_que_no_esta_publicada(self):
-        """Hoy acepta cualquier número: un error de tipeo (0.91 por 0.9.1) bloquearía todas las apps instaladas
-        al terminar la gracia, sin ninguna versión que las destrabe (ver la revisión, «Versión obligatoria»)."""
         with self.assertRaises(SystemExit):
             self.correr("obligar", "0.91")
 
@@ -120,10 +117,7 @@ class Aviso(unittest.TestCase):
         self.control({"ultima": "0.9.2", "minima": "0.9.2", "gracia_dias": 7, "minima_desde": "mañana"})
         self.assertIn("bloqueo", nube.novedades("0.9.1"))
 
-    @unittest.expectedFailure
     def test_una_minima_que_nadie_puede_instalar_no_bloquea(self):
-        """Hoy una versión mínima mayor que la última publicada bloquea igual, y no hay descarga que lo arregle
-        (ver la revisión, «Versión obligatoria»)."""
         self.control({"ultima": "0.9.1", "minima": "0.91", "gracia_dias": 0, "minima_desde": hace(30)})
         self.assertFalse(nube.novedades("0.9.1")["bloqueo"])
 

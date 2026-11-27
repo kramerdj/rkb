@@ -66,8 +66,8 @@ def abrir_privacidad():
 def elegir_carpeta(titulo):
     """Selector de carpeta cuando no hay ventana propia (modo navegador)."""
     if ES_MAC:
-        script = f'POSIX path of (choose folder with prompt "{titulo}")'
-        r = subprocess.run(["osascript", "-e", script], capture_output=True, text=True)
+        script = "on run argv\nreturn POSIX path of (choose folder with prompt (item 1 of argv))\nend run"
+        r = subprocess.run(["osascript", "-e", script, str(titulo)], capture_output=True, text=True)
         return r.stdout.strip().rstrip("/")
     try:
         import tkinter

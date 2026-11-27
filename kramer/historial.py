@@ -54,8 +54,25 @@ def listar():
         if op.get("id") not in vistos:
             op["deshecho"] = op.get("deshecho") or (Path(op["carpeta"]) / "deshecho.json").exists()
             items.append(op)
-    items.sort(key=lambda x: x["cuando"], reverse=True)
+    items.sort(key=lambda x: (x["cuando"], x.get("id") or ""), reverse=True)
     return items
+
+
+def _opcional(p, defecto):
+    """Un JSON que puede no existir; si existe y no se puede leer, falla (no se toma por vacío)."""
+    if not Path(p).exists():
+        return defecto
+    return json.loads(Path(p).read_text(encoding="utf-8"))
+
+
+def _apartar(ruta, previo, n, mover):
+    destino = previo / "archivos" / f"{n:05d}_{Path(ruta).name}"
+    destino.parent.mkdir(parents=True, exist_ok=True)
+    if mover:
+        shutil.move(str(ruta), destino)
+    else:
+        shutil.copy2(ruta, destino)
+    return 1
 
 
 class Operacion:
@@ -78,7 +95,15 @@ class Operacion:
         self.eliminados = {}       # original -> lugar en la carpeta «eliminados» (Deshacer los devuelve)
 
     def __enter__(self):
-        self.carpeta.mkdir(parents=True, exist_ok=True)
+        self.carpeta.parent.mkdir(parents=True, exist_ok=True)
+        base, n = self.carpeta, 1
+        while True:                     # dos operaciones en el mismo segundo no comparten carpeta
+            try:
+                self.carpeta.mkdir()
+                break
+            except FileExistsError:
+                n += 1
+                self.carpeta = base.with_name(f"{base.name}-{n}")
         if self.con_base:
             origen = Path(config.cargar()["rekordbox"])
             destino = self.carpeta / "base"
@@ -150,30 +175,45 @@ def deshacer(op_id):
             raise ValueError("Primero deshacé las operaciones más nuevas (se deshacen en orden).")
         op = vigentes[0]
         carpeta = Path(op["carpeta"])
+        incompleto = ValueError("El backup de esta operación está incompleto: no se puede deshacer. No se tocó nada.")
+        if op.get("con_base") and not (carpeta / "base" / "master.db").is_file():
+            raise incompleto
+        try:
+            mapa = json.loads((carpeta / "archivos.json").read_text(encoding="utf-8"))
+            renombrados = _opcional(carpeta / "renombrados.json", {})
+            creados = _opcional(carpeta / "creados.json", [])
+            eliminados = _opcional(carpeta / "eliminados.json", {})
+        except (OSError, ValueError):
+            raise incompleto
+        # Antes de pisar nada se guarda lo que hay ahora: lo que se hizo después de la operación no se pierde.
+        previo = carpeta / "antes de deshacer"
         if op.get("con_base"):
             destino = Path(config.cargar()["rekordbox"])
+            (previo / "base").mkdir(parents=True, exist_ok=True)
+            for n in ARCHIVOS_BASE:
+                if (destino / n).exists():
+                    shutil.copy2(destino / n, previo / "base" / n)
             for n in ARCHIVOS_BASE:
                 src, dst = carpeta / "base" / n, destino / n
                 if src.exists():
                     shutil.copy2(src, dst)
                 elif n.endswith(("-wal", "-shm")) and dst.exists():
                     dst.unlink()
-        try:
-            mapa = json.loads((carpeta / "archivos.json").read_text(encoding="utf-8"))
-        except Exception:
-            mapa = {}
-        for nuevo, viejo in (_leer_json(carpeta / "renombrados.json", {}) or {}).items():
+        for nuevo, viejo in renombrados.items():
             if Path(nuevo).exists() and not Path(viejo).exists():
                 os.rename(nuevo, viejo)
-        for original, apartado in (_leer_json(carpeta / "eliminados.json", {}) or {}).items():
+        for original, apartado in eliminados.items():
             if Path(apartado).exists() and not Path(original).exists():
                 Path(original).parent.mkdir(parents=True, exist_ok=True)
                 shutil.move(apartado, original)
-        for creado in _leer_json(carpeta / "creados.json", []) or []:
+        apartados = 0
+        for creado in creados:
             if Path(creado).exists() and creado not in mapa:
-                Path(creado).unlink()
+                apartados += _apartar(creado, previo, apartados, mover=True)
         for original, copia in mapa.items():
             if Path(copia).exists():
+                if Path(original).exists():
+                    apartados += _apartar(original, previo, apartados, mover=False)
                 Path(original).parent.mkdir(parents=True, exist_ok=True)
                 shutil.copy2(copia, original)
         _escribir_nuevo(carpeta / "deshecho.json", {"cuando": datetime.datetime.now().isoformat(timespec="seconds")})
