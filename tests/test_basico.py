@@ -4,8 +4,6 @@
 """
 import json
 import os
-import shutil
-import sys
 import tempfile
 import threading
 import time
@@ -15,14 +13,9 @@ import zipfile
 from collections import defaultdict
 from pathlib import Path
 
-RAIZ = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(RAIZ))
-TMP = Path(tempfile.mkdtemp(prefix="rkb-test-"))
-os.environ["KRAMER_APP_DIR"] = str(TMP / "app")           # nunca toca la configuración real
-os.environ.pop("KRAMER_NUBE_URL", None)
-os.environ["KRAMER_CONTROL_URL"] = ""                   # no consulta GitHub en las pruebas
+from entorno import TMP
 
-from kramer import categorias, config, lista, nombres, nube, respaldo  # noqa: E402
+from kramer import categorias, config, lista, nombres, nube, respaldo
 
 
 class Nombres(unittest.TestCase):
@@ -264,10 +257,6 @@ class Servidor(unittest.TestCase):
         st, cuerpo = self.get("/api/coleccion")
         self.assertEqual(st, 404)
         self.assertIn("No encuentro la base de Rekordbox", json.loads(cuerpo)["error"])
-
-
-def tearDownModule():
-    shutil.rmtree(TMP, ignore_errors=True)
 
 
 if __name__ == "__main__":
