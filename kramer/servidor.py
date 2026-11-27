@@ -36,6 +36,19 @@ class Error(Exception):
 OCULTAS = ("nube_sesion", "spotify_refresh", "cartelera_vistos", "estadisticas_estado")
 
 
+def tema_inicial():
+    """Modo con el que se abre la página: la primera vez en la 0.9.5, claro (para que se note la novedad);
+    después, el que eligió la persona o, si no eligió, el del sistema (vacío)."""
+    c = config.cargar()
+    if not c.get("tema_estreno"):
+        try:
+            config.guardar({"tema_estreno": True})
+        except Exception:
+            pass
+        return "claro"
+    return c.get("tema") if c.get("tema") in ("claro", "oscuro") else ""
+
+
 def requiere_cerrado():
     if rb.rekordbox_abierto():
         raise Error("Rekordbox está abierto. Cerralo para guardar en la base; "
@@ -807,6 +820,8 @@ def _validar_ajustes(b):
 
 def api_config(b):
     b = {k: v for k, v in b.items() if k not in ("nube_sesion", "spotify_refresh", "estadisticas_estado")}
+    if "tema" in b and b["tema"] not in ("", "claro", "oscuro"):
+        raise Error("El modo tiene que ser claro, oscuro o el del sistema.")
     _validar_ajustes(b)
     c = config.guardar(b)
     if b.get("acepto_riesgo") or b.get("estadisticas_avisado"):
@@ -968,6 +983,8 @@ class Handler(BaseHTTPRequestHandler):
             self.send_error(404)
             return
         datos = f.read_bytes()
+        if nombre == "index.html":
+            datos = datos.replace(b'<html lang="es">', f'<html lang="es" data-tema-guardado="{tema_inicial()}">'.encode(), 1)
         self.send_response(200)
         self.send_header("Content-Type", (mimetypes.guess_type(f.name)[0] or "text/plain") + "; charset=utf-8")
         self.send_header("Content-Length", str(len(datos)))

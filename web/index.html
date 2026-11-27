@@ -4,6 +4,14 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>RKB Collection Manager</title>
+<script>
+  // modo claro u oscuro antes de dibujar nada (el servidor pone data-tema-guardado: claro, oscuro o vacío = sistema)
+  (function () {
+    var r = document.documentElement, t = r.getAttribute('data-tema-guardado');
+    if (t !== 'claro' && t !== 'oscuro') t = window.matchMedia && matchMedia('(prefers-color-scheme: light)').matches ? 'claro' : 'oscuro';
+    r.setAttribute('data-tema', t);
+  })();
+</script>
 <link rel="stylesheet" href="app.css">
 </head>
 <body>
@@ -15,6 +23,9 @@
     </div>
     <div class="items" id="menu"></div>
     <div class="estado-rb" id="estadoRb"><span class="punto"></span><span>Revisando Rekordbox…</span></div>
+    <button type="button" class="tema-sw" id="btnTema" role="switch" aria-checked="false" title="Cambiar entre modo claro y oscuro">
+      <span class="tema-pista" aria-hidden="true"><span class="tema-bola"></span></span><span id="temaTxt">Modo oscuro</span>
+    </button>
     <div class="pie-menu"><button class="salir" id="btnAcerca" type="button">Acerca de</button><button class="salir" id="btnSalir" type="button">Cerrar la app</button></div>
   </nav>
 
@@ -331,6 +342,10 @@
             <select id="inicio"><option value="inicio">El principio</option><option value="seg">A unos segundos del inicio</option><option value="30">El 30 % del tema</option><option value="cue">El primer cue (si no tiene, el 30 %)</option></select>
           </label>
           <label class="campo">Segundos<input id="inicioSeg" type="number" min="0" max="600" step="5"></label>
+          <h2 class="sep">Apariencia</h2>
+          <label class="campo">Modo
+            <select id="tema"><option value="">El del sistema</option><option value="claro">Claro</option><option value="oscuro">Oscuro</option></select>
+          </label>
           <h2 class="sep">Privacidad</h2>
           <label class="campo-in"><input type="checkbox" id="estadisticas"> Enviar estadísticas anónimas de uso</label>
           <p class="nota">Sólo cuántas veces se instala y se abre la app, qué versión y sistema, y qué funciones se usan (como mucho una vez por día cada una). Nunca se envía nada de tu música ni de vos: ni temas, ni carpetas, ni nombres.</p>
@@ -362,7 +377,7 @@
     <div class="acciones" id="modalAcc"></div>
   </div>
 </div>
-<div class="aviso" id="aviso" hidden></div>
+<div class="aviso" id="aviso" role="status" aria-live="polite" title="Clic para cerrar" hidden></div>
 <div class="ct-toast" id="ctToast" hidden></div>
 <div class="ct-toast ct-toast-act" id="actToast" hidden></div>
 <datalist id="dl-genero"></datalist><datalist id="dl-grouping"></datalist><datalist id="dl-pais"></datalist><datalist id="dl-idioma"></datalist>

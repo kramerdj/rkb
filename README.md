@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <b>Versión 0.9.4 · beta</b> · Mac y Windows · Rekordbox 6 y 7 · GPL-3.0
+  <b>Versión 0.9.5 · beta</b> · Mac y Windows · Rekordbox 6 y 7 · GPL-3.0
 </p>
 
 ---

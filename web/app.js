@@ -20,10 +20,11 @@ async function api(ruta, cuerpo) {
   return d;
 }
 let tAviso;
-function aviso(msg, error) {
+function aviso(msg, error, ms) {
   const a = $('#aviso');
   a.textContent = msg; a.className = 'aviso' + (error ? ' error' : ''); a.hidden = false;
-  clearTimeout(tAviso); tAviso = setTimeout(() => { a.hidden = true; }, error ? 9000 : 4500);
+  a.setAttribute('role', error ? 'alert' : 'status');
+  clearTimeout(tAviso); tAviso = setTimeout(() => { a.hidden = true; }, ms || (error ? 9000 : 4500));
 }
 function modal(titulo, html, botones) {
   $('#modalTit').textContent = titulo;
@@ -39,6 +40,29 @@ function modal(titulo, html, botones) {
 }
 const cerrarModal = () => { $('#modal').hidden = true; $('#modal .caja').classList.remove('ancha', 'medio'); };
 
+// ---------------------------------------------------------------- MODO CLARO / OSCURO
+const sistemaClaro = window.matchMedia ? matchMedia('(prefers-color-scheme: light)') : null;
+function ponerTema(t) {
+  document.documentElement.setAttribute('data-tema', t);
+  const oscuro = t === 'oscuro';
+  $('#btnTema').setAttribute('aria-checked', String(oscuro));
+  $('#temaTxt').textContent = 'Modo oscuro';
+}
+ponerTema(document.documentElement.getAttribute('data-tema') || 'oscuro');
+$('#btnTema').onclick = async () => {
+  const t = document.documentElement.getAttribute('data-tema') === 'oscuro' ? 'claro' : 'oscuro';
+  ponerTema(t);
+  try { const d = await api('/api/config', { tema: t }); E.config = d.config; } catch (_) { /* queda para esta vez */ }
+};
+$('#tema').onchange = async (e) => {
+  const v = e.target.value;
+  ponerTema(v || (sistemaClaro && sistemaClaro.matches ? 'claro' : 'oscuro'));
+  try { const d = await api('/api/config', { tema: v }); E.config = d.config; } catch (err) { aviso(err.message, true); }
+};
+$('#aviso').addEventListener('click', () => { $('#aviso').hidden = true; });
+// si la persona nunca eligió, sigue al sistema también mientras la app está abierta
+if (sistemaClaro) sistemaClaro.addEventListener('change', (e) => { if (E.config && !E.config.tema) ponerTema(e.matches ? 'claro' : 'oscuro'); });
+
 // ---------------------------------------------------------------- MENÚ
 const VISTAS = [
   ['lista', 'Lista de temas'], ['descargas', 'Descargas'], ['incorporar', 'Incorporar'],
@@ -49,7 +73,7 @@ function pintarMenu() {
   const nube = typeof CT !== 'undefined' && CT.activo;
   const badge = (id) => (id === 'coleccion' && n ? n : id === 'cartelera' && nube && CT.nuevos ? CT.nuevos : 0);
   $('#menu').innerHTML = VISTAS.filter(([id]) => nube || (id !== 'cartelera' && id !== 'misanuncios')).map(([id, txt]) => id === '-' ? '<div class="sepm"></div>' :
-    `<button type="button" data-v="${id}" class="${E.vista === id ? 'act' : ''}"><span>${txt}</span>${badge(id) ? `<span class="badge">${badge(id)}</span>` : ''}</button>`).join('');
+    `<button type="button" data-v="${id}" class="${E.vista === id ? 'act' : ''}"${E.vista === id ? ' aria-current="page"' : ''}><span>${txt}</span>${badge(id) ? `<span class="badge">${badge(id)}</span>` : ''}</button>`).join('');
 }
 $('#menu').addEventListener('click', (e) => {
   const b = e.target.closest('button[data-v]'); if (b) irA(b.dataset.v);
@@ -926,6 +950,7 @@ async function pintarAjustes() {
   for (const k of ['spotify_id', 'spotify_secret', 'youtube_key']) $('#' + k).value = c[k] || '';
   pintarSpotify(); $('#discogs').value = c.discogs;
   $('#estadisticas').checked = c.estadisticas !== false;
+  $('#tema').value = c.tema || '';
   pintarHistorial();
 }
 $('#estadisticas').onchange = async (e) => {
@@ -977,7 +1002,7 @@ $('#historial').addEventListener('click', (e) => {
 async function salir() {
   audio.pause();
   try { await api('/api/salir', {}); } catch (_) { /* nada */ }
-  document.body.innerHTML = '<p style="padding:40px;color:#9AA0AA">La app se cerró. Ya podés cerrar esta ventana.</p>';
+  document.body.innerHTML = '<p style="padding:40px;color:var(--gris)">La app se cerró. Ya podés cerrar esta ventana.</p>';
 }
 $('#btnSalir').onclick = () => {
   if (!nPend()) { salir(); return; }
@@ -988,18 +1013,9 @@ $('#btnSalir').onclick = () => {
 
 // ---------------------------------------------------------------- INICIO
 function avisoEstadisticas() {
-  // para quien ya usaba la app antes de que existieran las estadísticas: se explica una sola vez
-  const guardar = async (prendidas) => {
-    const d = await api('/api/config', { estadisticas: prendidas, estadisticas_avisado: true });
-    E.config = d.config; cerrarModal();
-    if (!prendidas) aviso('Listo: no se envía ninguna estadística.');
-  };
-  modal('Estadísticas anónimas de uso', `
-    <p>Para saber cuánta gente usa la app de verdad, ahora envía <b>estadísticas anónimas</b>: cuántas veces se instala y se abre, qué versión y sistema, y qué funciones se usan (como mucho una vez por día cada una).</p>
-    <p>Nunca se envía nada de tu música ni de vos: ni temas, ni carpetas, ni nombres, ni cantidades. Se puede cambiar cuando quieras en Ajustes.</p>`, [
-    { txt: 'No enviar', fn: () => guardar(false) },
-    { txt: 'Dejar prendidas', prim: true, fn: () => guardar(true) },
-  ]);
+  // para quien ya usaba la app antes de que existieran las estadísticas: sólo se informa, una vez
+  api('/api/config', { estadisticas_avisado: true }).then((d) => { E.config = d.config; }).catch(() => {});
+  aviso('Novedad: la app envía estadísticas anónimas de uso (cuántas veces se abre y qué funciones se usan). Nunca nada de tu música ni de vos. Se apagan en Ajustes → Privacidad.', false, 14000);
 }
 function avisoRiesgo() {
   modal('Antes de empezar', `
@@ -1009,9 +1025,9 @@ function avisoRiesgo() {
       <li>Antes de cada cambio la app hace un backup y casi todo se puede deshacer, pero igual <b>tené tu propio backup</b> de la música y de Rekordbox (Archivo › Biblioteca › Hacer copia de seguridad).</li>
       <li>No está afiliada ni respaldada por AlphaTheta / Pioneer DJ (Rekordbox) ni por ninguna otra empresa.</li>
     </ul>
-    <label class="campo-in"><input type="checkbox" id="rgEstadisticas" checked> Enviar estadísticas anónimas de uso: sólo cuántas veces se abre la app y qué funciones se usan, nunca nada de tu música ni de vos (se cambia en Ajustes).</label>`, [
+    <p class="nota">La app envía estadísticas anónimas de uso (cuántas veces se abre y qué funciones se usan), nunca nada de tu música ni de vos. Se apagan en Ajustes → Privacidad.</p>`, [
     { txt: 'Salir', fn: salir },
-    { txt: 'Entiendo y acepto', prim: true, fn: async () => { const d = await api('/api/config', { acepto_riesgo: true, estadisticas: $('#rgEstadisticas').checked, estadisticas_avisado: true }); E.config = d.config; cerrarModal(); } },
+    { txt: 'Entiendo y acepto', prim: true, fn: async () => { const d = await api('/api/config', { acepto_riesgo: true, estadisticas_avisado: true }); E.config = d.config; cerrarModal(); } },
   ]);
 }
 (async () => {
