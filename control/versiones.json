@@ -1,7 +1,7 @@
 {
-  "ultima": "0.9.4",
+  "ultima": "0.9.5",
   "minima": null,
   "minima_desde": null,
   "gracia_dias": 7,
-  "mensaje": "La app ahora puede enviar estadísticas anónimas de uso (nada de tu música ni de vos). Se apagan en Ajustes → Privacidad."
+  "mensaje": "Nuevo: modo claro y oscuro. Se cambia con el interruptor abajo a la izquierda (o en Ajustes → Apariencia)."
 }
