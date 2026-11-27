@@ -40,7 +40,7 @@ class Coleccion(ConBase):
         t = col["temas"][0]
         self.assertEqual((t["id"], t["titulo"], t["artista"], t["genero"], t["anio"], t["decada"]),
                          (cid, "De Música Ligera", "Soda Stereo", "Rock", "1990", "90s"))
-        self.assertTrue(rb.mismo_path(t["ruta"], str(ruta)))
+        self.assertTrue(base_rb.misma_ruta(t["ruta"], ruta))
         self.assertEqual(col["momentos"], ["Previa", "Warm Up", "Main", "Peak", "Close", "Lentos"])
 
     def test_coleccion_vacia(self):
@@ -269,7 +269,8 @@ class Duplicados(ConBase):
         self.assertIsNone(base_rb.tema(self.b))
         self.assertFalse(self.b_ruta.exists())
         self.assertTrue(self.a_ruta.is_file())
-        self.assertEqual(Path(self.op.archivos[str(self.b_ruta)]).read_bytes(), original)
+        apartado = next(copia for ruta, copia in self.op.archivos.items() if base_rb.misma_ruta(ruta, self.b_ruta))
+        self.assertEqual(Path(apartado).read_bytes(), original)
         en_evento = {f["ContentID"] for f in self.consulta(m.DjmdSongPlaylist, PlaylistID=self.evento)}
         self.assertEqual(en_evento, {self.a, self.otro})
 
@@ -307,14 +308,14 @@ class OrdenarNombres(ConBase):
         nuevo = self.coleccion / "Soda Stereo - De Musica Ligera.mp3"
         self.assertTrue(nuevo.is_file())
         self.assertFalse(self.ruta.exists())
-        self.assertTrue(rb.mismo_path(base_rb.tema(self.cid)["ruta"], str(nuevo)))
+        self.assertTrue(base_rb.misma_ruta(base_rb.tema(self.cid)["ruta"], nuevo))
         self.assertEqual(rb.propuesta_nombres(), [])
 
     def test_deshacer_devuelve_el_nombre(self):
         self.renombrar([{"id": self.cid, "nuevo": "Soda Stereo - De Musica Ligera.mp3"}])
         historial.deshacer(self.op.carpeta.name)
         self.assertTrue(self.ruta.is_file())
-        self.assertTrue(rb.mismo_path(base_rb.tema(self.cid)["ruta"], str(self.ruta)))
+        self.assertTrue(base_rb.misma_ruta(base_rb.tema(self.cid)["ruta"], self.ruta))
 
     def test_no_pisa_otro_archivo(self):
         otro = self.coleccion / "Soda Stereo - De Musica Ligera.mp3"
