@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <b>Versión 0.9.3 · beta</b> · Mac y Windows · Rekordbox 6 y 7 · GPL-3.0
+  <b>Versión 0.9.4 · beta</b> · Mac y Windows · Rekordbox 6 y 7 · GPL-3.0
 </p>
 
 ---
@@ -119,6 +119,8 @@ La app levanta un servidor en `127.0.0.1` y muestra la interfaz en una ventana p
 ## Privacidad
 
 Tu colección, tus archivos y tu base de Rekordbox nunca salen de tu computadora. La app se conecta a internet sólo para buscar metadata y carátulas, leer playlists de Spotify, YouTube o Deezer, avisar si hay una versión nueva y mostrar la Cartelera.
+
+También envía **estadísticas anónimas de uso** a [Aptabase](https://aptabase.com) para saber cuánta gente usa la app: que se instaló, que se abrió (como mucho una vez por día, con versión, sistema, en cuántos días distintos se usó y semanas desde la instalación) y qué funciones se usan (como mucho una vez por día cada una). Nunca se envían temas, rutas, nombres, cantidades ni identificadores. Se apagan en **Ajustes → Privacidad**.
 
 ## Créditos
 

@@ -13,7 +13,8 @@ TMP = Path(tempfile.mkdtemp(prefix="rkb-test-"))
 os.environ["KRAMER_APP_DIR"] = str(TMP / "app")
 os.environ["KRAMER_CONTROL_URL"] = ""
 for variable in ("KRAMER_NUBE_URL", "KRAMER_NUBE_CLAVE", "KRAMER_ACTUALIZACION_URL", "KRAMER_ACTUALIZACION_CLAVE",
-                 "KRAMER_RB_TEST", "KRAMER_RB_DIR", "KRAMER_RB_BACKUPS"):
+                 "KRAMER_RB_TEST", "KRAMER_RB_DIR", "KRAMER_RB_BACKUPS",
+                 "KRAMER_ESTADISTICAS", "KRAMER_ESTADISTICAS_URL"):
     os.environ.pop(variable, None)
 
 sys.path.insert(0, str(RAIZ))

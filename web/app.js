@@ -925,8 +925,13 @@ async function pintarAjustes() {
   $('#inicio').value = c.inicio; $('#inicioSeg').value = c.inicio_seg; $('#lastfm').value = c.lastfm;
   for (const k of ['spotify_id', 'spotify_secret', 'youtube_key']) $('#' + k).value = c[k] || '';
   pintarSpotify(); $('#discogs').value = c.discogs;
+  $('#estadisticas').checked = c.estadisticas !== false;
   pintarHistorial();
 }
+$('#estadisticas').onchange = async (e) => {
+  try { const d = await api('/api/config', { estadisticas: e.target.checked, estadisticas_avisado: true }); E.config = d.config; aviso(e.target.checked ? 'Estadísticas anónimas prendidas. Gracias.' : 'Listo: no se envía ninguna estadística.'); }
+  catch (err) { aviso(err.message, true); e.target.checked = !e.target.checked; }
+};
 $('#carpetas').addEventListener('click', async (e) => {
   const b = e.target.closest('[data-carpeta]'); if (!b) return;
   const { ruta } = await api('/api/elegir_carpeta', { titulo: 'Elegí la carpeta' });
@@ -982,6 +987,20 @@ $('#btnSalir').onclick = () => {
 };
 
 // ---------------------------------------------------------------- INICIO
+function avisoEstadisticas() {
+  // para quien ya usaba la app antes de que existieran las estadísticas: se explica una sola vez
+  const guardar = async (prendidas) => {
+    const d = await api('/api/config', { estadisticas: prendidas, estadisticas_avisado: true });
+    E.config = d.config; cerrarModal();
+    if (!prendidas) aviso('Listo: no se envía ninguna estadística.');
+  };
+  modal('Estadísticas anónimas de uso', `
+    <p>Para saber cuánta gente usa la app de verdad, ahora envía <b>estadísticas anónimas</b>: cuántas veces se instala y se abre, qué versión y sistema, y qué funciones se usan (como mucho una vez por día cada una).</p>
+    <p>Nunca se envía nada de tu música ni de vos: ni temas, ni carpetas, ni nombres, ni cantidades. Se puede cambiar cuando quieras en Ajustes.</p>`, [
+    { txt: 'No enviar', fn: () => guardar(false) },
+    { txt: 'Dejar prendidas', prim: true, fn: () => guardar(true) },
+  ]);
+}
 function avisoRiesgo() {
   modal('Antes de empezar', `
     <p><b>RKB Collection Manager</b> es una herramienta gratuita hecha por un DJ para DJs. Trabaja directamente sobre tus archivos de música y sobre la base de datos de Rekordbox.</p>
@@ -989,15 +1008,17 @@ function avisoRiesgo() {
       <li>Puede tener errores. <b>La usás bajo tu propia responsabilidad</b>: ni el autor ni nadie que la comparta se hace responsable por pérdidas de datos, de archivos o problemas con Rekordbox.</li>
       <li>Antes de cada cambio la app hace un backup y casi todo se puede deshacer, pero igual <b>tené tu propio backup</b> de la música y de Rekordbox (Archivo › Biblioteca › Hacer copia de seguridad).</li>
       <li>No está afiliada ni respaldada por AlphaTheta / Pioneer DJ (Rekordbox) ni por ninguna otra empresa.</li>
-    </ul>`, [
+    </ul>
+    <label class="campo-in"><input type="checkbox" id="rgEstadisticas" checked> Enviar estadísticas anónimas de uso: sólo cuántas veces se abre la app y qué funciones se usan, nunca nada de tu música ni de vos (se cambia en Ajustes).</label>`, [
     { txt: 'Salir', fn: salir },
-    { txt: 'Entiendo y acepto', prim: true, fn: async () => { const d = await api('/api/config', { acepto_riesgo: true }); E.config = d.config; cerrarModal(); } },
+    { txt: 'Entiendo y acepto', prim: true, fn: async () => { const d = await api('/api/config', { acepto_riesgo: true, estadisticas: $('#rgEstadisticas').checked, estadisticas_avisado: true }); E.config = d.config; cerrarModal(); } },
   ]);
 }
 (async () => {
   pintarMenu(); irA('coleccion');
   await estado();
   if (E.config && !E.config.acepto_riesgo) avisoRiesgo();
+  else if (E.config && !E.config.estadisticas_avisado) avisoEstadisticas();
   await cargarColeccion();
   setInterval(estado, 5000);
 })();

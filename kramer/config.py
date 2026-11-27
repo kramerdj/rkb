@@ -33,6 +33,9 @@ DEFAULT = {
     "evento": None,             # {"id": playlist, "nombre": ...} del último evento creado
     "categorias": None,         # las 4 categorías de My Tags (nombre y de dónde salen)
     "acepto_riesgo": False,     # aviso de uso bajo propio riesgo
+    "estadisticas": True,       # enviar estadísticas anónimas de uso (kramer/estadisticas.py)
+    "estadisticas_avisado": False,  # ya vio la explicación (en el aviso del primer arranque o, si ya usaba la app, en uno propio)
+    "estadisticas_estado": None,  # qué ya se envió y en cuántos días se usó (sólo local, nunca se envía tal cual)
     "respaldo_destino": "",     # dónde guardar los backups completos (mejor un disco externo)
     "respaldo_share": True,     # incluir análisis, cues y carátulas de Rekordbox (carpeta share)
     "respaldo_otros": True,

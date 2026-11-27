@@ -251,7 +251,7 @@
 
         <div class="ac-bloque">
           <h2>Conexión a internet y privacidad</h2>
-          <p class="nota">Tu colección, tus archivos y tu base de Rekordbox nunca salen de tu computadora. La app se conecta a internet sólo para: buscar metadata y carátulas (en Descargas), leer playlists de Spotify, YouTube o Deezer, avisar si hay una versión nueva y mostrar la Cartelera (al servidor sólo se le dice el país que elegiste). Si publicás anuncios, se guarda tu email (no se muestra), tu nombre de DJ y lo que publicás.</p>
+          <p class="nota">Tu colección, tus archivos y tu base de Rekordbox nunca salen de tu computadora. La app se conecta a internet sólo para: buscar metadata y carátulas (en Descargas), leer playlists de Spotify, YouTube o Deezer, avisar si hay una versión nueva, mostrar la Cartelera (al servidor sólo se le dice el país que elegiste) y, si no las apagás en Ajustes, enviar estadísticas anónimas de uso a Aptabase (que se abrió la app, versión, sistema y qué funciones se usan; nunca temas, carpetas, nombres ni cantidades). Si publicás anuncios, se guarda tu email (no se muestra), tu nombre de DJ y lo que publicás.</p>
         </div>
         <div class="ac-bloque">
           <h2>Licencia</h2>
@@ -331,6 +331,9 @@
             <select id="inicio"><option value="inicio">El principio</option><option value="seg">A unos segundos del inicio</option><option value="30">El 30 % del tema</option><option value="cue">El primer cue (si no tiene, el 30 %)</option></select>
           </label>
           <label class="campo">Segundos<input id="inicioSeg" type="number" min="0" max="600" step="5"></label>
+          <h2 class="sep">Privacidad</h2>
+          <label class="campo-in"><input type="checkbox" id="estadisticas"> Enviar estadísticas anónimas de uso</label>
+          <p class="nota">Sólo cuántas veces se instala y se abre la app, qué versión y sistema, y qué funciones se usan (como mucho una vez por día cada una). Nunca se envía nada de tu música ni de vos: ni temas, ni carpetas, ni nombres.</p>
           <h2 class="sep">Claves de servicios (opcional)</h2>
           <label class="campo">Last.fm<input id="lastfm" placeholder="Clave de API"></label>
           <label class="campo">Discogs<input id="discogs" placeholder="Token personal"></label>

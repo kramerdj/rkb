@@ -13,7 +13,7 @@ from urllib.parse import parse_qs, urlparse
 
 import kramer_arranque
 
-from . import archivos, config, historial, plataforma, rb, trabajos
+from . import archivos, config, estadisticas, historial, plataforma, rb, trabajos
 
 CONGELADA = getattr(sys, "frozen", False)          # True dentro de "Kramer DJ.app"
 RAIZ = Path(kramer_arranque.estado()["carpeta"])
@@ -30,6 +30,10 @@ class Error(Exception):
     def __init__(self, msg, code=400):
         super().__init__(msg)
         self.code = code
+
+
+# ajustes internos que la página no ve
+OCULTAS = ("nube_sesion", "spotify_refresh", "cartelera_vistos", "estadisticas_estado")
 
 
 def requiere_cerrado():
@@ -72,10 +76,11 @@ def archivos_audio():
 
 
 def api_estado(q):
+    estadisticas.al_abrir(VERSION)          # en segundo plano y como mucho una vez por día
     p = config.pendientes()
     forzar = bool(q and q.get("revisar"))
     return {"version": VERSION, "ventana": EN_VENTANA, "rekordboxAbierto": rb.rekordbox_abierto(),
-            "config": {k: v for k, v in config.cargar().items() if k not in ("nube_sesion", "spotify_refresh", "cartelera_vistos")},
+            "config": {k: v for k, v in config.cargar().items() if k not in OCULTAS},
             "pendientes": len(p["momento"]) + len(p["meta"]) + len(p["tags"]), "permisoArchivos": permiso_archivos(forzar),
             "coleccionExiste": Path(config.cargar()["coleccion"]).is_dir(),
             "sistema": "windows" if plataforma.ES_WIN else "mac",
@@ -203,6 +208,7 @@ def api_sincronizar(_):
                 if actual[parte].get(tid) == valor:
                     del actual[parte][tid]
     config.cambiar_pendientes(quitar_aplicados)
+    estadisticas.uso("sincronizar")
     return {"mensaje": "Listo: " + " y ".join(partes) + ".", "errores": r["errores"]}
 
 
@@ -241,6 +247,7 @@ def api_duplicados_borrar(b):
                       "archivos guardados en el backup")
     extra = (f" En {r['yaEstaba']} playlists ya estaba la versión que queda, así que solo se sacó la repetida."
              if r["yaEstaba"] else "")
+    estadisticas.uso("duplicados")
     return {"mensaje": f"Listo: borré {r['borrados']} duplicados e hice {r['reemplazos']} reemplazos en playlists.{extra} "
                        "Los archivos quedaron en el backup (se recuperan con Deshacer).", "errores": r["errores"]}
 
@@ -284,7 +291,9 @@ def api_lista_comparar(b):
     items = lista.leer(b.get("texto", ""), b.get("nombre", ""))
     if not items:
         raise Error("No encontré temas en la lista. Usá una línea por tema: «Artista - Tema».")
-    return {"items": lista.comparar(items)}
+    r = lista.comparar(items)
+    estadisticas.uso("comparar lista")
+    return {"items": r}
 
 
 def api_lista_link(b):
@@ -329,6 +338,7 @@ def api_spotify_playlist(b):
         raise Error(str(e))
     t = trabajos.lanzar("spotify", lambda tr: streaming.spotify_crear_playlist(nombre, temas, b.get("publica"), tr),
                         total=len(temas))
+    estadisticas.uso("playlist Spotify")
     return {"trabajo": t.id}
 
 
@@ -437,6 +447,7 @@ def api_descargas_analizar(b):
     campos, fuentes = b.get("campos", {}), b.get("fuentes", {})
     config.guardar({"ingreso_campos": campos, "ingreso_fuentes": fuentes})
     t = trabajos.lanzar("analizar", lambda tr: ingreso.analizar(tr, rutas, campos, fuentes), total=len(rutas))
+    estadisticas.uso("analizar descargas")
     return {"trabajo": t.id}
 
 
@@ -491,6 +502,7 @@ def api_incorporar(b):
         r = ingreso.incorporar(rutas, b.get("playlist"), op, lambda s: None, b.get("playlistFecha", True))
         op.detalle = f"movidos a la colección y agregados a Rekordbox" + (
             f", {r['enPlaylist']} en la playlist" if r["enPlaylist"] else "")
+    estadisticas.uso("incorporar")
     return {**r, "mensaje": f"Listo: {r['incorporados']} temas en la colección y en Rekordbox"
                             + (f" ({r['enPlaylist']} en la playlist del evento)" if r["enPlaylist"] else "")
                             + (f", también en la playlist «{r['playlistFecha']}» (carpeta Importaciones)" if r.get("playlistFecha") else "")
@@ -600,6 +612,7 @@ def api_respaldo_hacer(b):
         respaldo._validar_destino(respaldo.destino())
     except respaldo.ErrorRespaldo as e:
         raise Error(str(e))
+    estadisticas.uso("backup")
     return _tarea_respaldo("respaldo", lambda t: respaldo.backup_completo(
         t, base=base, coleccion=col, con_share=bool(b.get("respaldo_share", True)), con_otros=bool(b.get("respaldo_otros", True))))
 
@@ -793,9 +806,12 @@ def _validar_ajustes(b):
 
 
 def api_config(b):
-    b = {k: v for k, v in b.items() if k not in ("nube_sesion", "spotify_refresh")}
+    b = {k: v for k, v in b.items() if k not in ("nube_sesion", "spotify_refresh", "estadisticas_estado")}
     _validar_ajustes(b)
-    return {"config": {k: v for k, v in config.guardar(b).items() if k not in ("nube_sesion", "spotify_refresh", "cartelera_vistos")}}
+    c = config.guardar(b)
+    if b.get("acepto_riesgo") or b.get("estadisticas_avisado"):
+        estadisticas.al_abrir(VERSION, de_nuevo=True)   # recién vio la explicación: cuenta como apertura
+    return {"config": {k: v for k, v in c.items() if k not in OCULTAS}}
 
 
 def api_historial(_):
@@ -817,6 +833,7 @@ def api_mytags(b):
     with historial.Operacion("Actualizar My Tags automáticos") as op:
         r = rb.sincronizar_categorias(simular=False)
         op.detalle = ", ".join(f"{c['nombre']}: {c['cambios']} temas" for c in r if c["fuente"] != "manual")
+    estadisticas.uso("My Tags")
     return {"resumen": r, "mensaje": "My Tags actualizados en Rekordbox."}
 
 
