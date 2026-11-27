@@ -20,3 +20,6 @@ dist/
 *.spec
 Thumbs.db
 desktop.ini
+
+# configuración local de Claude Code (cada uno la suya)
+.claude/settings.local.json
