@@ -1,7 +1,7 @@
 {
-  "ultima": "0.9.3",
+  "ultima": "0.9.4",
   "minima": null,
   "minima_desde": null,
   "gracia_dias": 7,
-  "mensaje": "La tabla de Colección se ve bien en notebooks, el menú es más simple y todo se lee mejor (más contraste y un desplegable de Género nuevo)."
+  "mensaje": "La app ahora puede enviar estadísticas anónimas de uso (nada de tu música ni de vos). Se apagan en Ajustes → Privacidad."
 }
