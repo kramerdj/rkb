@@ -530,6 +530,76 @@ TABLAS_TEMA = ["DjmdCue", "ContentCue", "ContentFile", "ContentActiveCensor", "D
                "DjmdSongTagList"]
 
 
+def revisar_eliminar(ids):
+    """Antes de eliminar: cada tema con las playlists donde está."""
+    with lock:
+        db = abrir()
+        try:
+            nombres = {str(p.ID): p.Name for p in db.get_playlist() if p.Attribute == 0}
+            out = []
+            for cid in dict.fromkeys(str(i) for i in ids):
+                c = db.get_content(ID=cid)
+                if c is None:
+                    continue
+                pls = sorted({nombres[str(s.PlaylistID)] for s in db.query(m.DjmdSongPlaylist)
+                              .filter(m.DjmdSongPlaylist.ContentID == cid) if str(s.PlaylistID) in nombres}, key=str.lower)
+                out.append({"id": cid, "titulo": c.Title or Path(c.FolderPath or "").stem,
+                            "artista": c.ArtistName or "", "playlists": pls})
+            return out
+        finally:
+            db.close()
+
+
+def eliminar_temas(ids, eliminar_archivo, log):
+    """Saca los temas de Rekordbox (y de sus playlists) y lleva sus archivos a la carpeta «eliminados».
+    eliminar_archivo(ruta) mueve el archivo (historial.Operacion.eliminar_archivo)."""
+    res = {"eliminados": 0, "dePlaylists": 0, "archivos": 0, "errores": []}
+    with lock:
+        db = abrir()
+        try:
+            rutas = []
+            for cid in dict.fromkeys(str(i) for i in ids):
+                c = db.get_content(ID=cid)
+                if c is None:
+                    continue
+                for s in list(db.query(m.DjmdSongPlaylist).filter(m.DjmdSongPlaylist.ContentID == cid)):
+                    db.remove_from_playlist(db.get_playlist(ID=s.PlaylistID), s)
+                    res["dePlaylists"] += 1
+                for nombre in TABLAS_TEMA + ["DjmdSongHistory", "DjmdSongSampler"]:
+                    modelo = getattr(m, nombre)
+                    for r in list(db.query(modelo).filter(modelo.ContentID == cid)):
+                        db.delete(r)
+                if c.FolderPath:
+                    rutas.append(c.FolderPath)
+                db.delete(c)
+                res["eliminados"] += 1
+                log(f"Eliminado: {c.ArtistName} - {c.Title}")
+            db.commit()
+            # sólo se mueven los archivos que ya no usa ningún otro tema de Rekordbox
+            en_uso = {_clave_path(c.FolderPath) for c in db.get_content()}
+            vistos = set()
+            for ruta in rutas:
+                k = _clave_path(ruta)
+                if k in en_uso or k in vistos or not Path(ruta).is_file():
+                    continue
+                vistos.add(k)
+                try:
+                    eliminar_archivo(ruta)
+                    res["archivos"] += 1
+                except PermissionError:
+                    motivo = ("Windows no dejó moverlo (¿está abierto en otro programa?)" if plataforma.ES_WIN
+                              else "macOS no dejó moverlo (falta «Acceso total al disco»)")
+                    res["errores"].append(f"{Path(ruta).name}: {motivo}. Quedó fuera de Rekordbox pero sigue en la carpeta.")
+                except Exception as e:
+                    res["errores"].append(f"{Path(ruta).name}: no se pudo mover ({e})")
+        except Exception:
+            db.rollback()
+            raise
+        finally:
+            db.close()
+    return res
+
+
 def borrar_duplicados(grupos, mover_archivo, log):
     """grupos: [{conservar: id, borrar: [ids]}]. Reemplaza en playlists, pasa el Momento
     y el historial de reproducción, borra de Rekordbox y mueve el archivo al backup."""

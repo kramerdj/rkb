@@ -78,6 +78,11 @@ def guardar(cambios):
         return c
 
 
+def dir_eliminados():
+    """Adonde van los temas que se eliminan de la colección (nunca se borran del disco)."""
+    return Path(cargar()["backup"]) / "eliminados"
+
+
 def dir_backups():
     return Path(cargar()["backup"]) / "Kramer DJ app"
 

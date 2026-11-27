@@ -44,6 +44,12 @@ main{flex:1;min-width:0;overflow:auto}
 .btn.prim{border:0;background:var(--acento);color:#17181B;font-weight:650}
 .btn.prim:disabled{background:var(--panel2);color:var(--gris);cursor:default}
 .btn.chico{height:32px;padding:0 10px;font-size:12px}
+.btn.peligro{color:var(--mal)}.btn.peligro:hover{border-color:var(--mal)}
+.btn.prim.peligro{background:var(--mal);color:#17181B}
+.el-lista{max-height:220px;overflow:auto;margin:8px 0;padding:8px 10px;border-radius:9px;background:var(--panel2);font-size:13px}
+.el-lista div{padding:2px 0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.el-lista small{color:var(--acento2)}
+.el-aviso{padding:10px 12px;border-radius:9px;background:var(--acentoBg);border:1px solid var(--acentoBorde);color:var(--acento2)}
 .btn:disabled{opacity:.6;cursor:default}
 .proximo{padding:28px;border-radius:14px;background:var(--panel);border:1px dashed #3A3E47;max-width:640px}
 .proximo h2{margin:0 0 6px;font-size:17px}.proximo p{margin:0;color:var(--gris)}

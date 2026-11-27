@@ -149,7 +149,7 @@
         <button type="button" class="btn prim chico" id="btnPrivacidad">Abrir Ajustes del Sistema</button>
       </div>
       <div class="filtros" id="filtros">
-        <input id="buscar" type="search" placeholder="Buscar artista, tema o álbum…" aria-label="Buscar">
+        <input id="buscar" type="search" placeholder="Buscar tema, artista o archivo…" title="Busca en el título, el artista, el álbum y el nombre del archivo" aria-label="Buscar">
       </div>
 
       <div class="player">
@@ -167,7 +167,7 @@
       <div class="momentos">
         <span class="lbl">Momento:</span>
         <div id="momBtns" class="mom-btns"></div>
-        <span class="atajos"><kbd id="kbdCmd">⌘</kbd>clic varios <kbd>⇧</kbd>clic rango <kbd>Tab</kbd> siguiente <kbd>⇧Tab</kbd> anterior <kbd>Espacio</kbd> play <kbd>←</kbd><kbd>→</kbd> ±10 s <kbd>0</kbd> borrar</span>
+        <span class="atajos"><kbd id="kbdCmd">⌘</kbd>clic varios <kbd>⇧</kbd>clic rango <kbd>Tab</kbd> siguiente <kbd>⇧Tab</kbd> anterior <kbd>Espacio</kbd> play <kbd>←</kbd><kbd>→</kbd> ±10 s <kbd>0</kbd> borrar <kbd id="kbdSupr">Supr</kbd> eliminar</span>
       </div>
 
       <div class="cuerpo">
@@ -193,6 +193,7 @@
           <div class="meta-acc">
             <button type="button" class="btn chico" id="btnFinder">Mostrar en Finder</button>
             <button type="button" class="btn chico" id="btnDescTema" hidden>Descartar cambios del tema</button>
+            <button type="button" class="btn chico peligro" id="btnEliminar" title="Saca el tema de Rekordbox y lleva el archivo a la carpeta «eliminados» (tecla Supr)">Eliminar</button>
           </div>
           <p class="nota">Los cambios quedan pendientes hasta que toques <b>Sincronizar</b>: se escriben en el archivo y en Rekordbox, y se recalculan los My Tags automáticos.</p>
           <div class="siguen" id="siguen">

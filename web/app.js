@@ -31,7 +31,7 @@ function modal(titulo, html, botones) {
   const acc = $('#modalAcc'); acc.innerHTML = '';
   for (const b of botones) {
     const el = document.createElement('button');
-    el.type = 'button'; el.className = 'btn' + (b.prim ? ' prim' : ''); el.textContent = b.txt;
+    el.type = 'button'; el.className = 'btn' + (b.prim ? ' prim' : '') + (b.peligro ? ' peligro' : ''); el.textContent = b.txt;
     el.onclick = async () => { if (b.fn) { el.disabled = true; try { await b.fn(); } finally { el.disabled = false; } } else cerrarModal(); };
     acc.appendChild(el);
   }
@@ -76,6 +76,7 @@ async function estado() {
     E.sistema = d.sistema;
     $('#btnFinder').textContent = d.sistema === 'windows' ? 'Mostrar en el Explorador' : 'Mostrar en Finder';
     $('#kbdCmd').textContent = d.sistema === 'windows' ? 'Ctrl' : '⌘';
+    $('#kbdSupr').textContent = d.sistema === 'windows' ? 'Supr' : 'fn ⌫';
     pintarPrimeraVez(d);
     if (document.activeElement !== $('#pSeg') && document.activeElement !== $('#pInicio')) pintarInicio();
     $('#version').textContent = 'Versión ' + d.version;
@@ -196,7 +197,7 @@ function aplicarFiltros() {
       const v = E.filtros[f[0]];
       if (v && ![].concat(f[2](t)).includes(v)) return false;
     }
-    if (q && !sinAcentos(`${val(t, 'titulo')} ${val(t, 'artista')} ${val(t, 'album')}`).includes(q)) return false;
+    if (q && !sinAcentos(`${val(t, 'titulo')} ${val(t, 'artista')} ${val(t, 'album')} ${(t.ruta || '').split(/[\\/]/).pop()}`).includes(q)) return false;
     return true;
   });
   const { k, dir } = E.orden;
@@ -314,6 +315,7 @@ function seleccionar(id, reproducir) {
   cargarMeta(id);
   pintarSiguen();
   pintarTagsMan();
+  pintarBtnEliminar();
   if (reproducir && t.existe) tocar(t); else { audio.pause(); audio.removeAttribute('src'); audio.load(); pintarTiempo(); }
 }
 function tocar(t) {
@@ -429,7 +431,44 @@ function pintarPanel() {
   } else {
     $('.meta-cab h2').textContent = 'Metadata';
   }
+  pintarBtnEliminar();
 }
+function pintarBtnEliminar() {
+  const n = idsElegidos().length;
+  $('#btnEliminar').hidden = !n;
+  $('#btnEliminar').textContent = n > 1 ? `Eliminar ${n} temas` : 'Eliminar';
+}
+const idsElegidos = () => (E.multi.size > 1 ? [...E.multi] : (E.sel ? [E.sel] : []));
+
+// ---------------------------------------------------------------- ELIMINAR TEMAS
+async function eliminarTemas() {
+  const ids = idsElegidos();
+  if (!ids.length) return;
+  let d;
+  try { d = await api('/api/eliminar/revisar', { ids }); } catch (e) { aviso(e.message, true); return; }
+  if (!d.temas.length) return;
+  const n = d.temas.length, uno = n === 1;
+  const enPl = d.temas.filter((t) => t.playlists.length);
+  const fila = (t) => `<div>${esc(t.artista ? `${t.artista} – ${t.titulo}` : t.titulo)}${t.playlists.length ? ` <small>· en ${esc(t.playlists.join(', '))}</small>` : ''}</div>`;
+  const html = `<p>${uno ? 'Este tema sale' : `Estos ${n} temas salen`} de Rekordbox y ${uno ? 'su archivo va' : 'sus archivos van'} a la carpeta <b>«eliminados»</b>. No se borra nada del disco y se puede deshacer desde Ajustes e historial.</p>
+    ${enPl.length ? `<p class="el-aviso"><b>Atención:</b> ${enPl.length === n ? (uno ? 'está' : 'todos están') : `${enPl.length} de ${n} ${enPl.length === 1 ? 'está' : 'están'}`} en alguna playlist. Si seguís, ${enPl.length === 1 ? 'sale' : 'salen'} también de esas playlists.</p>` : ''}
+    <div class="el-lista">${[...enPl, ...d.temas.filter((t) => !t.playlists.length)].map(fila).join('')}</div>
+    <p class="nota">Carpeta «eliminados»: ${esc(d.carpeta)}</p>`;
+  modal(uno ? '¿Eliminar este tema?' : `¿Eliminar ${n} temas?`, html, [
+    { txt: 'Cancelar', fn: cerrarModal },
+    { txt: enPl.length ? 'Eliminar igual' : (uno ? 'Eliminar' : `Eliminar ${n} temas`), prim: true, peligro: true, fn: async () => {
+      await estado();
+      if (E.rbAbierto) { aviso('Cerrá Rekordbox para eliminar (la app tiene que guardar en su base).', true); return; }
+      try {
+        const r = await api('/api/eliminar', { ids: d.temas.map((t) => t.id) });
+        cerrarModal();
+        if (r.errores && r.errores.length) aviso(`${r.mensaje} Ojo: ${r.errores.join(' · ')}`, true); else aviso(r.mensaje);
+        E.multi.clear(); E.sel = null; await cargarColeccion();
+      } catch (e) { aviso(e.message, true); }
+    } },
+  ]);
+}
+$('#btnEliminar').onclick = eliminarTemas;
 $('#btnLoteCancelar').onclick = limpiarMulti;
 $('#loteForm').addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); $('#btnLote').click(); } });
 $('#btnLote').onclick = async () => {
@@ -677,6 +716,7 @@ document.addEventListener('keydown', (e) => {
   if (e.key === 'Tab') { e.preventDefault(); if (E.multi.size) limpiarMulti(); moverSel(e.shiftKey ? -1 : 1); }
   else if (e.key >= '1' && e.key <= '4') { e.preventDefault(); if (teclas[+e.key - 1]) ponerMomento(teclas[+e.key - 1]); }
   else if (e.key === '0' || e.key === 'Backspace') { e.preventDefault(); ponerMomento(''); }
+  else if (e.key === 'Delete') { e.preventDefault(); eliminarTemas(); }
   else if (e.key === ' ') { e.preventDefault(); playPausa(); }
   else if (e.key === 'ArrowDown') { e.preventDefault(); moverSel(1); }
   else if (e.key === 'ArrowUp') { e.preventDefault(); moverSel(-1); }
