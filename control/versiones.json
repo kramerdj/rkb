@@ -1,7 +1,7 @@
 {
-  "ultima": "0.9.5",
+  "ultima": "0.9.6",
   "minima": null,
   "minima_desde": null,
   "gracia_dias": 7,
-  "mensaje": "Nuevo: modo claro y oscuro. Se cambia con el interruptor abajo a la izquierda (o en Ajustes → Apariencia)."
+  "mensaje": "Nuevo: «Actualizar metadata» en Colección (elegís qué datos y revisás antes de guardar) y una guía de inicio, que se vuelve a ver desde Acerca de."
 }
