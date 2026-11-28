@@ -1027,14 +1027,18 @@ function avisoRiesgo() {
     </ul>
     <p class="nota">La app envía estadísticas anónimas de uso (cuántas veces se abre y qué funciones se usan), nunca nada de tu música ni de vos. Se apagan en Ajustes → Privacidad.</p>`, [
     { txt: 'Salir', fn: salir },
-    { txt: 'Entiendo y acepto', prim: true, fn: async () => { const d = await api('/api/config', { acepto_riesgo: true, estadisticas_avisado: true }); E.config = d.config; cerrarModal(); } },
+    { txt: 'Entiendo y acepto', prim: true, fn: async () => { const d = await api('/api/config', { acepto_riesgo: true, estadisticas_avisado: true }); E.config = d.config; cerrarModal(); if (!E.config.guia_vista) abrirGuia(); } },
   ]);
 }
 (async () => {
   pintarMenu(); irA('coleccion');
   await estado();
   if (E.config && !E.config.acepto_riesgo) avisoRiesgo();
-  else if (E.config && !E.config.estadisticas_avisado) avisoEstadisticas();
+  else {
+    if (E.config && !E.config.guia_vista) abrirGuia();
+    if (E.config && !E.config.estadisticas_avisado) avisoEstadisticas();
+  }
+  if (typeof precargarGuia === 'function' && E.config && !E.config.guia_vista) precargarGuia();
   await cargarColeccion();
   setInterval(estado, 5000);
 })();
@@ -1192,8 +1196,117 @@ $('#modalCuerpo').addEventListener('change', (e) => {
   const ok = $('#modalAcc .btn.prim'); if (ok) { ok.textContent = `Renombrar ${NM.sel.size} archivos`; ok.disabled = !NM.sel.size; }
 });
 
+// ---------------------------------------------------------------- ACTUALIZAR METADATA DE LA COLECCIÓN
+const MD = { trabajo: null, items: [], sel: new Set() };
+const MD_NOMBRES = { artista: 'Artista', titulo: 'Título', genero: 'Género', grouping: 'Grouping', anio: 'Año', album: 'Álbum', pais: 'País', idioma: 'Idioma' };
+$('#btnMetadata').onclick = async () => {
+  let d;
+  try { d = await api('/api/coleccion/metadata/opciones'); } catch (e) { aviso(e.message, true); return; }
+  const elegidos = E.multi.size > 1 ? [...E.multi] : (E.sel ? [E.sel] : []);
+  const visibles = E.lista.map((t) => t.id), todos = E.temas.map((t) => t.id);
+  const alcances = [
+    elegidos.length && ['sel', elegidos, elegidos.length === 1 ? 'El tema elegido' : `Los ${elegidos.length} temas elegidos`],
+    visibles.length < todos.length && ['vis', visibles, `Los ${visibles.length} temas que se ven (con los filtros de ahora)`],
+    ['todos', todos, `Toda la colección (${todos.length} temas)`],
+  ].filter(Boolean);
+  MD.alcances = Object.fromEntries(alcances.map(([k, ids]) => [k, ids]));
+  const fuentes = Object.entries(d.nombresFuentes).map(([k, l]) => {
+    const falta = (k === 'lastfm' || k === 'discogs') && !d.claves[k];
+    return `<label><input type="checkbox" data-mdfuente="${k}" ${d.fuentes[k] && !falta ? 'checked' : ''} ${falta ? 'disabled' : ''}>${esc(l)}${falta ? '<small>falta clave (Ajustes)</small>' : ''}</label>`;
+  }).join('');
+  modal('Actualizar metadata de la colección', `
+    <p class="nota">Busca los datos de cada tema en internet y te muestra qué cambiaría. Todavía no se escribe nada: elegís qué aceptar, queda pendiente en la tabla y se guarda al tocar <b>Sincronizar</b> (con backup y se puede deshacer).</p>
+    <p class="md-alcance-t">¿Qué temas?</p>
+    <div class="md-alcance">${alcances.map(([k, , l], i) => `<label><input type="radio" name="mdAlcance" value="${k}" ${i === 0 ? 'checked' : ''}>${esc(l)}</label>`).join('')}</div>
+    <div class="md-dos">
+      <div><h3>¿Qué datos?</h3><div class="checks">${Object.entries(d.nombresCampos).map(([k, l]) =>
+        `<label><input type="checkbox" data-mdcampo="${k}" ${d.campos[k] ? 'checked' : ''}>${esc(l)}</label>`).join('')}</div></div>
+      <div><h3>Fuentes</h3><div class="checks">${fuentes}</div></div>
+    </div>
+    <p class="nota">Sin «Pisar datos que ya tienen» sólo se completa lo que está vacío. Con muchos temas tarda: unos segundos por tema.</p>`, [
+    { txt: 'Cancelar', fn: cerrarModal },
+    { txt: 'Buscar metadata', prim: true, fn: buscarMetadata },
+  ]);
+  $('#modal .caja').classList.add('medio');
+};
+async function buscarMetadata() {
+  const alcance = (document.querySelector('[name=mdAlcance]:checked') || {}).value;
+  const ids = MD.alcances[alcance] || [];
+  const campos = {}, fuentes = {};
+  document.querySelectorAll('[data-mdcampo]').forEach((i) => { campos[i.dataset.mdcampo] = i.checked; });
+  document.querySelectorAll('[data-mdfuente]').forEach((i) => { fuentes[i.dataset.mdfuente] = i.checked; });
+  let r;
+  try { r = await api('/api/coleccion/metadata', { ids, campos, fuentes }); } catch (e) { aviso(e.message, true); return; }
+  MD.trabajo = r.trabajo; MD.items = []; MD.sel = new Set();
+  $('#modalCuerpo').innerHTML = `<p>Buscando la metadata de ${ids.length} ${ids.length === 1 ? 'tema' : 'temas'}…</p>
+    <div class="md-prog"><div class="pbar"><div id="mdProgIn"></div></div><span id="mdProgTxt" class="nota"></span></div>
+    <p class="nota" id="mdProgTema"></p>`;
+  const acc = $('#modalAcc'); acc.innerHTML = '';
+  const cancelar = document.createElement('button'); cancelar.type = 'button'; cancelar.className = 'btn'; cancelar.textContent = 'Frenar y ver lo encontrado';
+  cancelar.onclick = () => api('/api/trabajo/cancelar', { id: MD.trabajo });
+  acc.append(cancelar);
+  const t = await seguir(MD.trabajo, (x) => {
+    MD.items.push(...x.items);
+    const pct = x.total ? Math.round((x.hechos / x.total) * 100) : 0;
+    const bar = $('#mdProgIn'); if (bar) bar.style.width = pct + '%';
+    const txt = $('#mdProgTxt'); if (txt) txt.textContent = `${x.hechos} de ${x.total} · ${tiempo(x.resta)}`;
+    const tm = $('#mdProgTema'); if (tm) tm.textContent = x.mensaje || '';
+  });
+  if (t.estado === 'error') { $('#modalCuerpo').innerHTML = `<p>${esc(t.error)}</p>`; acc.innerHTML = ''; acc.append(Object.assign(document.createElement('button'), { type: 'button', className: 'btn', textContent: 'Cerrar', onclick: cerrarModal })); return; }
+  MD.conCambios = MD.items.filter((it) => Object.keys(it.cambios).length);
+  MD.sel = new Set(MD.conCambios.filter((it) => it.confianza !== 'BAJA').map((it) => it.id));
+  pintarMetadata(t.estado === 'cancelado');
+}
+function pintarMetadata(frenado) {
+  const n = MD.conCambios.length, errores = MD.items.filter((it) => it.error).length;
+  const fila = (it) => `<label class="md-fila"><input type="checkbox" data-md="${it.id}" ${MD.sel.has(it.id) ? 'checked' : ''}>
+    <span><b>${esc(it.artista ? `${it.artista} – ${it.titulo}` : it.titulo || it.archivo)}</b>
+    <span class="md-cambios">${Object.entries(it.cambios).map(([k, c]) => `<span>${MD_NOMBRES[k] || k}: ${c.antes ? `<s>${esc(c.antes)}</s> → ` : ''}<em>${esc(c.despues)}</em></span>`).join('')}</span>
+    ${it.notas.length ? `<span class="md-nota">${esc(it.notas.join(' · '))}</span>` : ''}</span></label>`;
+  $('#modalCuerpo').innerHTML = `
+    <p class="nota">${frenado ? 'Frenado a mitad de camino. ' : ''}Revisé ${MD.items.length} ${MD.items.length === 1 ? 'tema' : 'temas'}: ${n ? `${n} con datos para actualizar` : 'no encontré nada para cambiar'}${errores ? ` · ${errores} no se pudieron analizar` : ''}. Los que no figuran bien en las fuentes vienen sin marcar.</p>
+    ${n ? `<div class="nm-cab"><span class="nota">${MD.sel.size} de ${n} marcados · <a href="#" id="mdTodos">marcar todos</a> · <a href="#" id="mdNinguno">ninguno</a></span></div>
+    <div class="md-lista">${MD.conCambios.slice(0, 800).map(fila).join('')}</div>` : ''}`;
+  const acc = $('#modalAcc'); acc.innerHTML = '';
+  const cerrar = Object.assign(document.createElement('button'), { type: 'button', className: 'btn', textContent: n ? 'Descartar' : 'Cerrar', onclick: cerrarModal });
+  acc.append(cerrar);
+  if (n) {
+    const ok = Object.assign(document.createElement('button'), { type: 'button', className: 'btn prim' });
+    const rotular = () => { ok.textContent = `Dejar pendientes ${MD.sel.size} ${MD.sel.size === 1 ? 'tema' : 'temas'}`; ok.disabled = !MD.sel.size; };
+    rotular();
+    ok.onclick = aceptarMetadata;
+    acc.append(ok);
+    $('#mdTodos').onclick = (e) => { e.preventDefault(); MD.conCambios.forEach((it) => MD.sel.add(it.id)); pintarMetadata(frenado); };
+    $('#mdNinguno').onclick = (e) => { e.preventDefault(); MD.sel.clear(); pintarMetadata(frenado); };
+    $('#modalCuerpo').onchange = (e) => {
+      const id = e.target.dataset.md; if (!id) return;
+      if (e.target.checked) MD.sel.add(id); else MD.sel.delete(id);
+      rotular();
+      const c = $('#modalCuerpo .nm-cab .nota'); if (c) c.firstChild.textContent = `${MD.sel.size} de ${n} marcados · `;
+    };
+  }
+}
+async function aceptarMetadata() {
+  const items = MD.conCambios.filter((it) => MD.sel.has(it.id)).map((it) => {
+    const pm = { ...(E.pend.meta[it.id] || {}) };
+    for (const [k, c] of Object.entries(it.cambios)) pm[k] = c.despues;
+    E.pend.meta[it.id] = pm;
+    return { id: it.id, meta: pm };
+  });
+  try {
+    const d = await api('/api/pendiente_lote', { items });
+    E.pend = d.pendientes; E.pend.tags = E.pend.tags || {};
+    $('#modalCuerpo').onchange = null;
+    cerrarModal();
+    aviso(`Listo: ${items.length} ${items.length === 1 ? 'tema queda pendiente' : 'temas quedan pendientes'}. Revisalos en la tabla y tocá Sincronizar para guardarlos en los archivos y en Rekordbox.`, false, 9000);
+    pintarListas(); pintarFiltros(); aplicarFiltros(); pintarSync(); pintarMenu(); pintarPanel();
+    if (E.sel) cargarMeta(E.sel);
+  } catch (e) { aviso(e.message, true); }
+}
+
 // ---------------------------------------------------------------- ACERCA DE
 $('#btnAcerca').onclick = () => irA('acerca');
+$('#acGuia').onclick = () => abrirGuia(0);
 $('#acLicencia').onclick = async () => {
   const r = await fetch('/LICENSE.txt'); const t = r.ok ? await r.text() : 'No encontré el texto de la licencia.';
   modal('GNU General Public License v3', `<div class="licencia">${esc(t)}</div>`, [{ txt: 'Cerrar' }]);

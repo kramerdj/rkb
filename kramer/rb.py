@@ -130,6 +130,25 @@ _CAMELOT = {"C": "8B", "G": "9B", "D": "10B", "A": "11B", "E": "12B", "B": "1B",
             "Cm": "5A", "Gm": "6A", "Dm": "7A"}
 
 
+def temas_para_metadata(ids):
+    """Lo que dice Rekordbox de cada tema, para proponer metadata nueva (ingreso.analizar_coleccion)."""
+    with lock:
+        db = abrir()
+        try:
+            out = []
+            for cid in dict.fromkeys(str(i) for i in ids):
+                c = db.get_content(ID=cid)
+                if c is None:
+                    continue
+                pais, idioma = archivos.pais_idioma(c.Commnt or "")
+                out.append({"id": cid, "ruta": c.FolderPath or "", "titulo": c.Title or "", "artista": c.ArtistName or "",
+                            "album": c.AlbumName or "", "anio": c.ReleaseYear or "", "genero": c.GenreName or "",
+                            "pais": pais, "idioma": idioma})
+            return out
+        finally:
+            db.close()
+
+
 def _entero(v):
     """Veces tocado: pyrekordbox declara la columna como texto, así que puede llegar "41", 41 o nada."""
     try:

@@ -40,7 +40,7 @@ const fechaCorta = (f, h) => {
 
 // ---------------------------------------------------------------- al abrir la app: versión y novedades
 async function chequearNovedades() {
-  if (!E.config || !E.config.acepto_riesgo || !$('#modal').hidden) { setTimeout(chequearNovedades, 1500); return; }
+  if (!E.config || !E.config.acepto_riesgo || !$('#modal').hidden || (typeof GU !== 'undefined' && GU.abierta)) { setTimeout(chequearNovedades, 1500); return; }
   let d;
   try { d = await api('/api/novedades'); } catch (_) { return; }
   CT.nov = d; CT.activo = !!d.activo; CT.nuevos = d.nuevos || 0;

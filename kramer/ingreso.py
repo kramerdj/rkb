@@ -21,6 +21,11 @@ CAMPOS = {"genero": "Género", "grouping": "Subgénero (Grouping)", "anio": "Añ
           "pisar": "Pisar datos que ya tienen"}
 DEFAULT_CAMPOS = {k: k != "pisar" for k in CAMPOS}
 DEFAULT_FUENTES = {k: True for k in FUENTES}
+# Colección existente: sólo datos (los nombres de archivo van por «Ordenar nombres», la carátula no se toca)
+CAMPOS_COLECCION = {"genero": "Género", "grouping": "Subgénero (Grouping)", "anio": "Año", "album": "Álbum",
+                    "pais": "País", "idioma": "Idioma", "artista_titulo": "Artista y título (corregidos y prolijos)",
+                    "pisar": "Pisar datos que ya tienen"}
+DEFAULT_CAMPOS_COLECCION = {k: k not in ("pisar", "artista_titulo") for k in CAMPOS_COLECCION}
 
 
 def preparar_ffmpeg():
@@ -182,6 +187,68 @@ def analizar(trabajo, rutas, campos, fuentes_on):
         list(pool.map(uno, enumerate(rutas)))
     F.guardar()
     return {"total": len(rutas)}
+
+
+def analizar_coleccion(trabajo, temas, campos, fuentes_on):
+    """Temas que ya están en Rekordbox: busca la metadata en las fuentes y propone cambios. No escribe nada.
+    temas: [{id, ruta, titulo, artista, album, anio, genero, pais, idioma}] (lo que dice Rekordbox).
+    Cada item del trabajo: {id, archivo, artista, titulo, cambios: {campo: {antes, despues}}, confianza, notas}."""
+    c = config.cargar()
+    apagadas = [k for k, v in fuentes_on.items() if not v]
+    F = FuentesElegidas(c.get("lastfm", ""), c.get("discogs", ""), apagadas)
+    from . import nombres
+    with rb.lock:
+        conocidos = rb.artistas_conocidos()
+    pisar = bool(campos.get("pisar"))
+
+    def uno(t):
+        if trabajo.cancelar:
+            return
+        p = Path(t.get("ruta") or "")
+        item = {"id": str(t["id"]), "archivo": p.name, "artista": t.get("artista", ""), "titulo": t.get("titulo", ""),
+                "cambios": {}, "notas": []}
+        try:
+            if not p.is_file():
+                raise FileNotFoundError("no encuentro el archivo")
+            tags = oc.leer_tags(p)
+            r = oc.analizar_tema(p, F, tags)
+            actual = {"titulo": t.get("titulo") or "", "artista": t.get("artista") or "", "album": t.get("album") or "",
+                      "anio": str(t.get("anio") or "")[:4], "genero": t.get("genero") or "",
+                      "grouping": tags.get("grouping") or "", "pais": t.get("pais") or "", "idioma": t.get("idioma") or ""}
+            propuesto = {}
+            if campos.get("artista_titulo") and r.get("confianza") != "BAJA":
+                propuesto["artista"], propuesto["titulo"] = nombres.prolijo(r["artista"], r["titulo"], conocidos)
+            if campos.get("genero"):
+                propuesto["genero"] = r.get("genero") or ""
+            if campos.get("grouping"):
+                propuesto["grouping"] = oc.elegir_grouping(r, actual["grouping"]) or ""
+            if campos.get("anio"):
+                propuesto["anio"] = str(r["anio"])[:4] if r.get("anio") else ""
+            if campos.get("album"):
+                propuesto["album"] = r.get("album") or ""
+            if campos.get("pais"):
+                propuesto["pais"] = r.get("pais") or ""
+            if campos.get("idioma"):
+                propuesto["idioma"] = r.get("idioma") or ""
+            for k, nuevo in propuesto.items():
+                antes = actual.get(k, "")
+                # sin «pisar» sólo se completa lo que está vacío; nunca se borra un dato con uno vacío
+                if nuevo and nuevo != antes and (pisar or not antes or k in ("artista", "titulo")):
+                    item["cambios"][k] = {"antes": antes, "despues": nuevo}
+            item["confianza"] = r.get("confianza", "")
+            if r.get("confianza") == "BAJA":
+                item["notas"].append("No figura en las fuentes: revisá antes de aceptar")
+            elif r.get("notas"):
+                item["notas"].append(r["notas"])
+        except Exception as e:
+            item["notas"].append(f"No se pudo analizar ({e})")
+            item["error"] = True
+        trabajo.avanzar(item, f"{item['artista']} - {item['titulo']}".strip(" -"))
+
+    with ThreadPoolExecutor(max_workers=6) as pool:
+        list(pool.map(uno, temas))
+    F.guardar()
+    return {"total": len(temas)}
 
 
 def aplicar_metadata(items, op, log):

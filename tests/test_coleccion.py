@@ -358,6 +358,56 @@ class EliminarTemas(ConBase):
         self.assertIsNotNone(base_rb.tema(self.a))
         self.assertEqual({f["ContentID"] for f in self.consulta(m.DjmdSongPlaylist, PlaylistID=self.evento)}, {self.a, self.b})
 
+class MetadataColeccion(ConBase):
+    """«Actualizar metadata» en Colección: propone cambios (no escribe) y respeta lo que ya tiene el tema."""
+
+    def setUp(self):
+        super().setUp()
+        _, self.soda = self.tema("soda.mp3", "De Música Ligera", "Soda Stereo", genero="Rock", anio=1990)
+        _, self.vacio = self.tema("queen.mp3", "Bohemian Rhapsody", "Queen")
+        self.fuentes = {
+            "De Música Ligera": {"artista": "Soda Stereo", "titulo": "De Música Ligera", "genero": "Rock Nacional",
+                                 "anio": 1990, "album": "Canción Animal", "pais": "Argentina", "idioma": "Español",
+                                 "confianza": "ALTA"},
+            "Bohemian Rhapsody": {"artista": "Queen", "titulo": "Bohemian Rhapsody", "genero": "Rock", "anio": 1975,
+                                  "album": "A Night at the Opera", "pais": "Inglaterra", "idioma": "Inglés",
+                                  "confianza": "ALTA"},
+        }
+
+    def analizar(self, campos, ids=None):
+        from kramer import trabajos
+        def falso(p, F, tags):
+            return dict(self.fuentes[tags["title"]])
+        temas = rb.temas_para_metadata(ids or [self.soda, self.vacio])
+        t = trabajos.Trabajo("prueba", len(temas))
+        with mock.patch.object(ingreso.oc, "analizar_tema", side_effect=falso), \
+             mock.patch.object(ingreso.oc, "elegir_grouping", return_value=""), \
+             mock.patch.object(ingreso.FuentesElegidas, "guardar"):
+            ingreso.analizar_coleccion(t, temas, campos, {})
+        return {it["id"]: it for it in t.items}
+
+    def test_sin_pisar_solo_completa_lo_vacio(self):
+        r = self.analizar({"genero": True, "anio": True, "album": True, "pais": True})
+        self.assertEqual(r[self.soda]["cambios"], {"album": {"antes": "", "despues": "Canción Animal"},
+                                                   "pais": {"antes": "", "despues": "Argentina"}})
+        self.assertEqual(set(r[self.vacio]["cambios"]), {"genero", "anio", "album", "pais"})
+        self.assertEqual(base_rb.tema(self.soda)["genero"], "Rock")          # no escribe nada
+
+    def test_pisando_cambia_lo_que_es_distinto(self):
+        r = self.analizar({"genero": True, "pisar": True}, [self.soda])
+        self.assertEqual(r[self.soda]["cambios"], {"genero": {"antes": "Rock", "despues": "Rock Nacional"}})
+
+    def test_solo_los_datos_elegidos(self):
+        r = self.analizar({"idioma": True}, [self.vacio])
+        self.assertEqual(r[self.vacio]["cambios"], {"idioma": {"antes": "", "despues": "Inglés"}})
+
+    def test_archivo_que_falta_no_frena_el_resto(self):
+        ruta = Path(base_rb.tema(self.vacio)["ruta"])
+        ruta.unlink()
+        r = self.analizar({"genero": True})
+        self.assertTrue(r[self.vacio].get("error"))
+        self.assertEqual(len(r), 2)
+
 class OrdenarNombres(ConBase):
     def setUp(self):
         super().setUp()

@@ -30,11 +30,13 @@ DEFAULT = {
     "spotify_usuario": "",          # opcional: para leer playlists de YouTube de más de 100 videos
     "ingreso_campos": None,     # qué datos actualiza el paso 2
     "ingreso_fuentes": None,    # qué fuentes consulta
+    "coleccion_campos": None,   # qué datos actualiza «Actualizar metadata» en Colección
     "evento": None,             # {"id": playlist, "nombre": ...} del último evento creado
     "categorias": None,         # las 4 categorías de My Tags (nombre y de dónde salen)
     "acepto_riesgo": False,     # aviso de uso bajo propio riesgo
     "tema": "",                 # "" = el del sistema, "claro" u "oscuro" (lo eligió la persona)
     "tema_estreno": False,      # la 0.9.5 arranca una vez en claro para que se note el cambio
+    "guia_vista": False,        # la guía de bienvenida ya se mostró (se vuelve a ver desde «Acerca de»)
     "estadisticas": True,       # enviar estadísticas anónimas de uso (kramer/estadisticas.py)
     "estadisticas_avisado": False,  # ya vio la explicación (en el aviso del primer arranque o, si ya usaba la app, en uno propio)
     "estadisticas_estado": None,  # qué ya se envió y en cuántos días se usó (sólo local, nunca se envía tal cual)

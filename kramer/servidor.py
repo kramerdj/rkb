@@ -452,6 +452,32 @@ def api_descargas(_):
             "claves": {"lastfm": bool(c.get("lastfm")), "discogs": bool(c.get("discogs"))}}
 
 
+def api_coleccion_metadata_opciones(_):
+    from . import ingreso
+    c = config.cargar()
+    return {"campos": {**ingreso.DEFAULT_CAMPOS_COLECCION, **(c.get("coleccion_campos") or {})},
+            "fuentes": {**ingreso.DEFAULT_FUENTES, **(c.get("ingreso_fuentes") or {})},
+            "nombresCampos": ingreso.CAMPOS_COLECCION,
+            "nombresFuentes": {k: v for k, v in ingreso.FUENTES.items() if k != "img"},
+            "claves": {"lastfm": bool(c.get("lastfm")), "discogs": bool(c.get("discogs"))}}
+
+
+def api_coleccion_metadata(b):
+    """Busca metadata para temas de la colección (no escribe nada: los cambios aceptados quedan pendientes)."""
+    from . import ingreso
+    temas = rb.temas_para_metadata([str(i) for i in b.get("ids", [])])
+    if not temas:
+        raise Error("Elegí al menos un tema.")
+    campos = {k: bool(v) for k, v in (b.get("campos") or {}).items() if k in ingreso.CAMPOS_COLECCION}
+    if not any(v for k, v in campos.items() if k != "pisar"):
+        raise Error("Marcá al menos un dato para actualizar.")
+    fuentes = {k: bool(v) for k, v in (b.get("fuentes") or {}).items() if k in ingreso.FUENTES}
+    config.guardar({"coleccion_campos": campos})
+    t = trabajos.lanzar("metadata_coleccion", lambda tr: ingreso.analizar_coleccion(tr, temas, campos, fuentes),
+                        total=len(temas))
+    return {"trabajo": t.id}
+
+
 def api_descargas_analizar(b):
     from . import ingreso
     rutas = [r for r in b.get("rutas", []) if Path(r).is_file()]
@@ -883,7 +909,7 @@ def api_mostrar(b):
 
 GET = {"/api/estado": api_estado, "/api/coleccion": api_coleccion, "/api/tema": api_tema,
        "/api/traer": api_traer_buscar, "/api/historial": api_historial,
-       "/api/duplicados": api_duplicados, "/api/descargas": api_descargas, "/api/trabajo": api_trabajo,
+       "/api/duplicados": api_duplicados, "/api/coleccion/metadata/opciones": api_coleccion_metadata_opciones, "/api/descargas": api_descargas, "/api/trabajo": api_trabajo,
        "/api/incorporar": api_incorporar_estado, "/api/chequeo": api_chequeo, "/api/mytags": api_mytags_listar,
        "/api/nombres": api_nombres, "/api/spotify": api_spotify_estado, "/api/backups": api_backups,
        "/api/novedades": api_novedades, "/api/carpeta_sugerida": api_carpeta_sugerida, "/api/cartelera": api_cartelera, "/api/nube/quien": api_nube_quien,
@@ -894,6 +920,7 @@ GET = {"/api/estado": api_estado, "/api/coleccion": api_coleccion, "/api/tema": 
 POST = {"/api/pendiente": api_pendiente, "/api/pendiente_lote": api_pendiente_lote, "/api/descartar": api_descartar,
         "/api/sincronizar": api_sincronizar, "/api/traer": api_traer_aplicar,
         "/api/config": api_config, "/api/duplicados": api_duplicados_borrar,
+        "/api/coleccion/metadata": api_coleccion_metadata,
         "/api/eliminar/revisar": api_eliminar_revisar, "/api/eliminar": api_eliminar, "/api/eliminados/abrir": api_eliminados_abrir,
         "/api/lista/comparar": api_lista_comparar, "/api/lista/link": api_lista_link,
         "/api/spotify/conectar": api_spotify_conectar, "/api/spotify/desconectar": api_spotify_desconectar,
